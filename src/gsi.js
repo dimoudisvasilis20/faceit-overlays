@@ -29,6 +29,7 @@ export function ingestGsiPayload(token, body) {
     tScore: map.team_t?.score ?? null,
     playerTeam: player.team || null,
     playerName: player.name || null,
+    playerSteamId: player.steamid || null,
     bomb: round.bomb || null,
     players,
     updatedAt: Date.now(),

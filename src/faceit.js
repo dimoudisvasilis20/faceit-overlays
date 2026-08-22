@@ -39,12 +39,9 @@ export async function getPlayerStats(playerId) {
   );
 }
 
-export async function getPlayerSummary(nickname) {
-  const player = await getPlayerByNickname(nickname);
+async function summarizePlayer(player) {
   const gameData = player.games?.[GAME_ID];
-  if (!gameData) {
-    throw new Error(`Player "${nickname}" has no ${GAME_ID} data on FACEIT`);
-  }
+  if (!gameData) return null;
 
   const stats = await getPlayerStats(player.player_id).catch(() => null);
   const lifetime = stats?.lifetime ?? {};
@@ -72,6 +69,39 @@ export async function getPlayerSummary(nickname) {
       avgKills,
     },
   };
+}
+
+export async function getPlayerSummary(nickname) {
+  const player = await getPlayerByNickname(nickname);
+  const summary = await summarizePlayer(player);
+  if (!summary) {
+    throw new Error(`Player "${nickname}" has no ${GAME_ID} data on FACEIT`);
+  }
+  return summary;
+}
+
+export async function getPlayerByGameId(gameId) {
+  return cached(`steam:${gameId}`, 60_000, () =>
+    dataApiGet(`/players?game=${GAME_ID}&game_player_id=${encodeURIComponent(gameId)}`)
+  );
+}
+
+// Looks up FACEIT stats for a whole match's roster by Steam ID (as reported
+// by CS2's GSI, which knows nothing about FACEIT accounts). Not every
+// steamId is guaranteed to resolve - a player might not have a FACEIT
+// account linked to that Steam profile - so each entry is best-effort.
+export async function getRosterSummaries(steamIds) {
+  return Promise.all(
+    steamIds.map(async (steamId) => {
+      try {
+        const player = await getPlayerByGameId(steamId);
+        const summary = await summarizePlayer(player);
+        return summary ? { steamId, found: true, ...summary } : { steamId, found: false };
+      } catch {
+        return { steamId, found: false };
+      }
+    })
+  );
 }
 
 export async function getTodaySummary(nickname) {

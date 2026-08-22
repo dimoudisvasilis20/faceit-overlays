@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getPlayerSummary, getTodaySummary } from './faceit.js';
+import { getPlayerSummary, getTodaySummary, getRosterSummaries } from './faceit.js';
 import { ingestGsiPayload, getGsiState } from './gsi.js';
 import { rateLimit } from './rateLimit.js';
 
@@ -53,6 +53,26 @@ app.get('/api/today', async (req, res) => {
   }
   try {
     res.json(await getTodaySummary(nickname));
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Resolves FACEIT stats for the current match's roster (from GSI-reported
+// Steam IDs) - meant to be called once per match by the client, not polled.
+app.get('/api/roster/:token', async (req, res) => {
+  const state = getGsiState(req.params.token);
+  if (!state.live || !state.players?.length) {
+    return res.json({ live: false });
+  }
+  try {
+    const roster = await getRosterSummaries(state.players.map((p) => p.steamId));
+    res.json({
+      live: true,
+      playerTeam: state.playerTeam,
+      players: state.players,
+      roster,
+    });
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

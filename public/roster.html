@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CS2 Match Roster Overlay</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  html, body { width: 100%; height: 100%; }
+  #wrap {
+    position: fixed;
+    inset: 0;
+    transition: opacity 0.3s ease;
+  }
+  #matchbar {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 8px 16px;
+  }
+  .team-elo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; }
+  .flag { font-size: 20px; }
+  .team-elo.enemy { flex-direction: row-reverse; }
+  .vs { color: var(--text-dim); font-size: 12px; text-transform: uppercase; }
+  #map { color: var(--accent); font-weight: 700; font-size: 14px; text-transform: uppercase; letter-spacing: 0.5px; }
+  .list {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 260px;
+  }
+  #mineList { left: 20px; }
+  #enemyList { right: 20px; }
+  .row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 6px 10px;
+  }
+  .row.me { border-color: rgba(255, 85, 0, 0.55); }
+  .row-avatar { width: 32px; height: 32px; border-radius: 50%; object-fit: cover; background: #222; flex-shrink: 0; }
+  .row-id { min-width: 0; flex: 1; }
+  .row-name { font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row-elo { font-size: 11px; color: var(--accent); font-weight: 600; }
+  .row-stats { display: flex; gap: 8px; flex-shrink: 0; }
+  .row-stat { display: flex; flex-direction: column; align-items: center; min-width: 30px; }
+  .row-stat-value { font-size: 12px; font-weight: 700; }
+  .row-stat-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-dim); }
+</style>
+</head>
+<body>
+  <div id="wrap" class="hidden">
+    <div id="matchbar">
+      <div class="team-elo mine">
+        <span class="flag" id="mineFlag"></span>
+        <span id="mineElo">-</span>
+      </div>
+      <div>
+        <div id="map">MAP</div>
+        <div class="vs">VS</div>
+      </div>
+      <div class="team-elo enemy">
+        <span class="flag" id="enemyFlag"></span>
+        <span id="enemyElo">-</span>
+      </div>
+    </div>
+    <div class="list" id="mineList"></div>
+    <div class="list" id="enemyList"></div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  const pollMs = Number(params.get('refresh')) || 3_000;
+  const wrapEl = document.getElementById('wrap');
+
+  let cachedRoster = null; // { live, playerTeam, players, roster, mySteamId } for the current match
+
+  function countryFlag(code) {
+    if (!code || code.length !== 2) return '';
+    return String.fromCodePoint(...[...code.toUpperCase()].map((c) => 127397 + c.charCodeAt(0)));
+  }
+
+  function majorityCountry(entries) {
+    const counts = {};
+    for (const e of entries) {
+      if (!e?.country) continue;
+      counts[e.country] = (counts[e.country] || 0) + 1;
+    }
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return sorted[0]?.[0] || null;
+  }
+
+  function averageElo(entries) {
+    const elos = entries.map((e) => e?.elo).filter((v) => typeof v === 'number');
+    if (!elos.length) return null;
+    return Math.round(elos.reduce((a, b) => a + b, 0) / elos.length);
+  }
+
+  function rowHtml(name, avatar, elo, found, stats, isMe) {
+    const s = stats || {};
+    return `
+      <div class="row${isMe ? ' me' : ''}">
+        <img class="row-avatar" src="${avatar || ''}" alt="" />
+        <div class="row-id">
+          <div class="row-name">${name}</div>
+          <div class="row-elo">${found ? (elo ?? '-') + ' ELO' : 'No FACEIT'}</div>
+        </div>
+        <div class="row-stats">
+          <div class="row-stat">
+            <div class="row-stat-value">${s.winRatePct != null ? s.winRatePct + '%' : '-'}</div>
+            <div class="row-stat-label">Win</div>
+          </div>
+          <div class="row-stat">
+            <div class="row-stat-value">${s.avgKills ?? '-'}</div>
+            <div class="row-stat-label">Avg</div>
+          </div>
+          <div class="row-stat">
+            <div class="row-stat-value">${s.headshotPct != null ? s.headshotPct + '%' : '-'}</div>
+            <div class="row-stat-label">HS</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function render() {
+    if (!cachedRoster || !cachedRoster.live) {
+      wrapEl.classList.add('hidden');
+      return;
+    }
+
+    const bySteamId = new Map((cachedRoster.roster || []).map((r) => [r.steamId, r]));
+    const mine = cachedRoster.players.filter((p) => p.team === cachedRoster.playerTeam);
+    const enemy = cachedRoster.players.filter((p) => p.team !== cachedRoster.playerTeam);
+    const mineStats = mine.map((p) => bySteamId.get(p.steamId)).filter(Boolean);
+    const enemyStats = enemy.map((p) => bySteamId.get(p.steamId)).filter(Boolean);
+
+    document.getElementById('map').textContent = (cachedRoster.map || 'LIVE').replace(/^de_/, '');
+    document.getElementById('mineElo').textContent = averageElo(mineStats) ?? '-';
+    document.getElementById('enemyElo').textContent = averageElo(enemyStats) ?? '-';
+    document.getElementById('mineFlag').textContent = countryFlag(majorityCountry(mineStats));
+    document.getElementById('enemyFlag').textContent = countryFlag(majorityCountry(enemyStats));
+
+    document.getElementById('mineList').innerHTML = mine
+      .map((p) => {
+        const stats = bySteamId.get(p.steamId);
+        const isMe = p.steamId === cachedRoster.mySteamId;
+        return rowHtml(p.name || 'Unknown', stats?.avatar, stats?.elo, !!stats?.found, stats?.stats, isMe);
+      })
+      .join('');
+
+    document.getElementById('enemyList').innerHTML = enemy
+      .map((p) => {
+        const stats = bySteamId.get(p.steamId);
+        return rowHtml(p.name || 'Unknown', stats?.avatar, stats?.elo, !!stats?.found, stats?.stats, false);
+      })
+      .join('');
+
+    wrapEl.classList.remove('hidden');
+  }
+
+  async function poll() {
+    if (!token) return;
+    try {
+      const gsiRes = await fetch(`/api/gsi/${encodeURIComponent(token)}`);
+      const gsiState = await gsiRes.json();
+
+      if (!gsiState.live) {
+        cachedRoster = null;
+        render();
+        return;
+      }
+
+      if (!cachedRoster) {
+        const rosterRes = await fetch(`/api/roster/${encodeURIComponent(token)}`);
+        const rosterData = await rosterRes.json();
+        if (rosterData.live) {
+          cachedRoster = { ...rosterData, map: gsiState.map, mySteamId: gsiState.playerSteamId };
+        }
+      } else {
+        cachedRoster.map = gsiState.map;
+      }
+      render();
+    } catch {
+      // Transient error - keep showing whatever was last rendered.
+    }
+  }
+
+  poll();
+  setInterval(poll, pollMs);
+</script>
+</body>
+</html>
