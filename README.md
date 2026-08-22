@@ -1,7 +1,7 @@
 # FACEIT Overlays
 
 OBS overlays that pull CS2 stats from FACEIT: a player-stats card (ELO, level,
-K/D, win rate) and a best-effort live-match scoreboard. One deployment can
+K/D, win rate) and a match start/end alert toast. One deployment can
 serve overlays for **any** FACEIT nickname via `?nickname=` — a single hosted
 instance works for multiple streamers, each using their own nickname; only
 the person running the server needs a FACEIT API key.
@@ -34,22 +34,21 @@ have transparent backgrounds, so no chroma key is needed.
 - `compact.html` — level, nickname, ELO(+delta), today's wins/losses, suggested size 320×70
 - `stats.html` — everything above plus K/D, win rate, HS%, ADR, avg kills, suggested size 560×90
 
-Live match + start/end alerts (`live.html`, `alerts.html`) work differently —
-see below.
+Match start/end alerts (`alerts.html`) work differently — see below.
 
 If you only stream one FACEIT account, set `DEFAULT_NICKNAME` in `.env` and
 drop the `?nickname=` query param entirely.
 
-## Live match + start/end alerts (CS2 GSI)
+## Match start/end alerts (CS2 GSI)
 
 FACEIT has no official API for "what match is this player in right now" - the
 only endpoint that exposes it is an internal, undocumented one used by
 faceit.com's own website, and it's protected by Cloudflare bot-detection that
 blocks non-browser HTTP clients (including this server) regardless of
-headers. Rather than fight that, `live.html` and `alerts.html` read live
-match state directly from the CS2 client itself via Valve's **Game State
-Integration** feature - richer data, zero dependency on FACEIT, and it can't
-be blocked by anti-bot tooling since it's an official first-party feature.
+headers. Rather than fight that, `alerts.html` reads live match state
+directly from the CS2 client itself via Valve's **Game State Integration**
+feature - richer data, zero dependency on FACEIT, and it can't be blocked by
+anti-bot tooling since it's an official first-party feature.
 
 This only works for the CS2 client on your own PC (GSI is inherently local -
 it's the game reporting on itself), so it's a one-time setup separate from
@@ -58,8 +57,9 @@ the FACEIT-nickname-based overlays above:
 1. Open `/gsi-setup.html` on your deployment - it generates a private token
    and the exact `gamestate_integration_*.cfg` file content for you.
 2. Save that file into CS2's `game/csgo/cfg/` folder and restart CS2.
-3. Add the generated `live.html?token=...` and `alerts.html?token=...` URLs
-   as Browser Sources.
+3. Add the generated `alerts.html?token=...` URL as a Browser Source. It
+   stays invisible except for a few seconds when a match starts (map +
+   opponents) or ends (win/loss + final score).
 
 `src/gsi.js` holds the latest state per token in memory (no database) and
 treats it as stale/not-live after 45s without an update from the game.

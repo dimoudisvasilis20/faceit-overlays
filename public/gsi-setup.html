@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>CS2 Live Match Setup</title>
+<title>CS2 Match Alerts Setup</title>
 <style>
   body {
     font-family: 'Segoe UI', Arial, sans-serif;
@@ -44,9 +44,9 @@
 </style>
 </head>
 <body>
-  <h1>CS2 live match overlay setup</h1>
-  <p>FACEIT doesn't officially expose a "current match" API, so the live overlay
-  reads directly from CS2 itself using Valve's <strong>Game State Integration</strong>
+  <h1>CS2 match alerts setup</h1>
+  <p>FACEIT doesn't officially expose a "current match" API, so match alerts
+  read directly from CS2 itself using Valve's <strong>Game State Integration</strong>
   feature - your game client sends live match state straight to this server. This
   only works for the CS2 client running on your own PC.</p>
 
@@ -62,13 +62,10 @@
   <h2>2. Restart CS2</h2>
   <p>Fully close and reopen Counter-Strike 2 so it picks up the new config file.</p>
 
-  <h2>3. Add the overlays to OBS/Streamlabs</h2>
-  <p>Add a <strong>Browser Source</strong> for the live scoreboard:</p>
-  <div class="box" id="liveUrl"></div>
-  <p style="color:#9ba0a8;font-size:13px;">Suggested size: 380×70.</p>
-  <p>And another for match start/end alerts:</p>
+  <h2>3. Add the overlay to OBS/Streamlabs</h2>
+  <p>Add a <strong>Browser Source</strong> for match start/end alerts:</p>
   <div class="box" id="alertsUrl"></div>
-  <p style="color:#9ba0a8;font-size:13px;">Suggested size: 320×90. Both are transparent and stay hidden until you're in a live match.</p>
+  <p style="color:#9ba0a8;font-size:13px;">Suggested size: 320×90. Transparent, and invisible except for a few seconds when a match starts or ends.</p>
 
 <script>
   function randomToken() {
@@ -104,7 +101,6 @@
   }
 }`;
 
-    document.getElementById('liveUrl').textContent = `${location.origin}/live.html?token=${token}`;
     document.getElementById('alertsUrl').textContent = `${location.origin}/alerts.html?token=${token}`;
   }
 
