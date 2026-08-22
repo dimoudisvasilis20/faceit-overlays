@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FACEIT Match Alerts</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  body { padding: 12px; }
+</style>
+</head>
+<body>
+  <div id="card" class="card toast">
+    <div id="title" class="toast-title">MATCH STARTED</div>
+    <div id="main" class="toast-main">-</div>
+    <div id="sub" class="toast-sub"></div>
+  </div>
+
+<script src="overlay-common.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const nickname = params.get('nickname');
+  const pollMs = Number(params.get('refresh')) || 10_000;
+  const displayMs = Number(params.get('duration')) || 8_000;
+  const el = (id) => document.getElementById(id);
+
+  let wasLive = null;
+  let hideTimer = null;
+
+  function showToast() {
+    clearTimeout(hideTimer);
+    el('card').classList.add('show');
+    hideTimer = setTimeout(() => el('card').classList.remove('show'), displayMs);
+  }
+
+  function showMatchStart(live) {
+    el('title').textContent = 'Match started';
+    el('main').className = 'toast-main';
+    el('main').textContent = live.map || 'Map TBD';
+    el('sub').textContent = live.otherTeam?.name ? 'vs ' + live.otherTeam.name : '';
+    showToast();
+  }
+
+  async function showMatchEnd() {
+    // Match history can lag a few seconds right as the match closes.
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const result = await fetchOverlayJSON('/api/lastmatch', nickname).catch(() => null);
+      if (result?.found) {
+        el('title').textContent = 'Match ended';
+        el('main').className = 'toast-main ' + (result.won ? 'win' : 'loss');
+        el('main').textContent = (result.won ? 'VICTORY' : 'DEFEAT') +
+          (result.myScore != null ? ' ' + result.myScore + '-' + result.otherScore : '');
+        el('sub').textContent = '';
+        showToast();
+        return;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+    }
+  }
+
+  async function poll() {
+    try {
+      const live = await fetchOverlayJSON('/api/live', nickname);
+      if (wasLive === null) {
+        wasLive = live.live;
+        return;
+      }
+      if (!wasLive && live.live) {
+        showMatchStart(live);
+      } else if (wasLive && !live.live) {
+        showMatchEnd();
+      }
+      wasLive = live.live;
+    } catch {
+      // Transient error - keep last known state and try again next poll.
+    }
+  }
+
+  poll();
+  setInterval(poll, pollMs);
+</script>
+</body>
+</html>

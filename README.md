@@ -27,11 +27,14 @@ the person running the server needs a FACEIT API key.
 ## Adding to OBS
 
 Add a **Browser Source** for each overlay, pointing at the URL from the setup
-page (e.g. `http://localhost:4173/stats.html?nickname=yourname`). Both pages
+page (e.g. `http://localhost:4173/stats.html?nickname=yourname`). All pages
 have transparent backgrounds, so no chroma key is needed.
 
-- `stats.html` — suggested size 420×80
-- `live.html` — suggested size 380×70
+- `mini.html` — level ring + ELO only, suggested size 200×60
+- `compact.html` — level, nickname, ELO(+delta), today's wins/losses, suggested size 320×70
+- `stats.html` — everything above plus K/D and win rate, suggested size 460×90
+- `live.html` — live match scoreboard, suggested size 380×70
+- `alerts.html` — match-started / match-ended toast, suggested size 320×90 (stays invisible otherwise)
 
 If you only stream one FACEIT account, set `DEFAULT_NICKNAME` in `.env` and
 drop the `?nickname=` query param entirely.
@@ -44,6 +47,9 @@ drop the `?nickname=` query param entirely.
   "LIVE" badge on faceit.com profiles — FACEIT does not officially expose a
   "current match" endpoint. It can stop working without notice; if it does,
   `live.html` will just stay hidden instead of erroring.
+- **Match-end results** come from FACEIT's official match history, so they
+  only appear once the match is fully finished and processed — `alerts.html`
+  retries for about 15s after detecting a match ended before giving up.
 - The server (`src/server.js`) is what keeps your API key off the page — the
   browser only ever talks to the server, never to FACEIT directly.
 - `/api/*` routes are rate-limited per IP (`src/rateLimit.js`) since every

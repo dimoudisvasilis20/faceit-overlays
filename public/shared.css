@@ -188,3 +188,38 @@ html, body {
   align-self: stretch;
   background: rgba(255, 255, 255, 0.12);
 }
+
+.toast {
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.toast-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--accent);
+}
+
+.toast-main {
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.toast-main.win { color: #4ade80; }
+.toast-main.loss { color: #f87171; }
+
+.toast-sub {
+  font-size: 13px;
+  color: var(--text-dim);
+}

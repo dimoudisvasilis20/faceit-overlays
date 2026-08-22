@@ -94,6 +94,33 @@ export async function getTodaySummary(nickname) {
   });
 }
 
+export async function getLastMatchResult(nickname) {
+  const player = await getPlayerByNickname(nickname);
+  const playerId = player.player_id;
+
+  return cached(`lastmatch:${playerId}`, 15_000, async () => {
+    const history = await dataApiGet(
+      `/players/${playerId}/history?game=${GAME_ID}&limit=1`
+    ).catch(() => ({ items: [] }));
+
+    const match = history.items?.[0];
+    if (!match || match.status !== 'finished') return { found: false };
+
+    const inFaction1 = match.teams?.faction1?.players?.some((p) => p.player_id === playerId);
+    const myFaction = inFaction1 ? 'faction1' : 'faction2';
+    const otherFaction = myFaction === 'faction1' ? 'faction2' : 'faction1';
+
+    return {
+      found: true,
+      matchId: match.match_id,
+      won: match.results?.winner === myFaction,
+      myScore: match.results?.score?.[myFaction] ?? null,
+      otherScore: match.results?.score?.[otherFaction] ?? null,
+      finishedAt: match.finished_at ?? null,
+    };
+  });
+}
+
 // Best-effort live-match detection using FACEIT's public web API (the same
 // call faceit.com uses to show the "LIVE" badge on a profile). This is NOT
 // part of the official documented Data API, has no key/auth, and can change

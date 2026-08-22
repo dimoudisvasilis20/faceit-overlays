@@ -2,10 +2,10 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>FACEIT Stats Overlay — Full</title>
+<title>FACEIT Stats Overlay — Compact</title>
 <link rel="stylesheet" href="shared.css" />
 <style>
-  body { padding: 12px; }
+  body { padding: 10px; }
 </style>
 </head>
 <body>
@@ -17,22 +17,12 @@
       </svg>
       <div class="level-number" id="level">-</div>
     </div>
-    <img id="avatar" class="avatar" src="" alt="" />
     <div>
       <div id="nickname" class="nickname">-</div>
       <div class="elo-block">
         <span id="elo" class="elo">- ELO</span>
         <span id="eloDelta" class="elo-delta hidden"></span>
       </div>
-    </div>
-    <div class="divider"></div>
-    <div class="stat">
-      <div id="kd" class="stat-value">-</div>
-      <div class="stat-label">K/D</div>
-    </div>
-    <div class="stat">
-      <div id="winrate" class="stat-value">-</div>
-      <div class="stat-label">Win %</div>
     </div>
     <div class="divider"></div>
     <div class="record">
@@ -75,11 +65,8 @@
 
       el('nickname').textContent = data.nickname;
       el('elo').textContent = (data.elo ?? '-') + ' ELO';
-      el('avatar').src = data.avatar || '';
       el('level').textContent = data.level ?? '-';
       el('level').style.color = levelColor(data.level);
-      el('kd').textContent = data.stats.kd ?? '-';
-      el('winrate').textContent = data.stats.winRatePct != null ? data.stats.winRatePct + '%' : '-';
       el('winsToday').textContent = today.wins ?? 0;
       el('lossesToday').textContent = today.losses ?? 0;
 

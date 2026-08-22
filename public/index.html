@@ -24,6 +24,24 @@
     color: #fff;
     font-size: 14px;
   }
+  .styles {
+    display: flex;
+    gap: 8px;
+    margin-top: 4px;
+  }
+  .styles label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin: 0;
+    padding: 8px 12px;
+    border: 1px solid #333;
+    border-radius: 6px;
+    background: #1a1c20;
+    font-weight: 400;
+    cursor: pointer;
+  }
+  .styles input { width: auto; margin: 0; }
   .url-box {
     margin-top: 8px;
     padding: 10px;
@@ -45,29 +63,42 @@
   <label for="nickname">FACEIT nickname</label>
   <input id="nickname" placeholder="e.g. s1mple" />
 
-  <label>Player stats overlay</label>
+  <label>Stats overlay style</label>
+  <div class="styles">
+    <label><input type="radio" name="style" value="mini" /> Mini</label>
+    <label><input type="radio" name="style" value="compact" /> Compact</label>
+    <label><input type="radio" name="style" value="stats" checked /> Full</label>
+  </div>
   <div class="url-box" id="statsUrl"></div>
 
   <label>Live match overlay</label>
   <div class="url-box" id="liveUrl"></div>
 
+  <label>Match start / end alerts</label>
+  <div class="url-box" id="alertsUrl"></div>
+
   <p style="margin-top:24px;color:#9ba0a8;font-size:13px;">
-    Suggested OBS Browser Source size: 420 × 80 for the stats overlay, 380 × 70 for the live overlay. Both backgrounds are transparent.
+    Suggested OBS Browser Source sizes: 200 × 60 (Mini), 320 × 70 (Compact), 460 × 90 (Full), 380 × 70 (Live match), 320 × 90 (Alerts). All backgrounds are transparent.
   </p>
 
 <script>
   const input = document.getElementById('nickname');
   const statsUrl = document.getElementById('statsUrl');
   const liveUrl = document.getElementById('liveUrl');
+  const alertsUrl = document.getElementById('alertsUrl');
+  const styleInputs = document.querySelectorAll('input[name="style"]');
 
   function render() {
     const nick = input.value.trim();
     const qs = nick ? `?nickname=${encodeURIComponent(nick)}` : '';
-    statsUrl.textContent = `${location.origin}/stats.html${qs}`;
+    const style = document.querySelector('input[name="style"]:checked').value;
+    statsUrl.textContent = `${location.origin}/${style}.html${qs}`;
     liveUrl.textContent = `${location.origin}/live.html${qs}`;
+    alertsUrl.textContent = `${location.origin}/alerts.html${qs}`;
   }
 
   input.addEventListener('input', render);
+  styleInputs.forEach((r) => r.addEventListener('change', render));
   render();
 </script>
 </body>

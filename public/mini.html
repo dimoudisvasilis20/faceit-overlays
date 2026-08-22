@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FACEIT Stats Overlay — Mini</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  body { padding: 10px; }
+  .card { padding: 6px 14px 6px 6px; gap: 10px; }
+</style>
+</head>
+<body>
+  <div id="card" class="card hidden">
+    <div class="level-ring">
+      <svg viewBox="0 0 48 48">
+        <circle class="track" cx="24" cy="24" r="20"></circle>
+        <circle class="progress" id="ringProgress" cx="24" cy="24" r="20"></circle>
+      </svg>
+      <div class="level-number" id="level">-</div>
+    </div>
+    <span id="elo" class="nickname">- ELO</span>
+  </div>
+
+<script src="overlay-common.js"></script>
+<script>
+  const params = new URLSearchParams(location.search);
+  const nickname = params.get('nickname');
+  const refreshMs = Number(params.get('refresh')) || 30_000;
+  const el = (id) => document.getElementById(id);
+
+  async function refresh() {
+    try {
+      const data = await fetchOverlayJSON('/api/player', nickname);
+
+      el('elo').textContent = (data.elo ?? '-') + ' ELO';
+      el('level').textContent = data.level ?? '-';
+      el('level').style.color = levelColor(data.level);
+
+      if (data.level != null && data.elo != null) {
+        renderLevelRing(el('ringProgress'), data.level, data.elo);
+      }
+
+      el('card').classList.remove('hidden');
+    } catch {
+      el('card').classList.add('hidden');
+    }
+  }
+
+  refresh();
+  setInterval(refresh, refreshMs);
+</script>
+</body>
+</html>
