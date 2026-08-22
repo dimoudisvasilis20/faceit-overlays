@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CS2 Live Match Setup</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #101114;
+    color: #f5f6f7;
+    max-width: 680px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1 { color: #ff5500; }
+  h2 { font-size: 16px; margin-top: 28px; }
+  label { display: block; margin-top: 16px; font-weight: 600; }
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    margin-top: 4px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #1a1c20;
+    color: #fff;
+    font-size: 14px;
+  }
+  .box {
+    margin-top: 8px;
+    padding: 10px;
+    background: #1a1c20;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    user-select: all;
+  }
+  ol { padding-left: 20px; }
+  li { margin-bottom: 8px; }
+  code { background: #1a1c20; padding: 1px 5px; border-radius: 4px; }
+  a { color: #ff5500; }
+</style>
+</head>
+<body>
+  <h1>CS2 live match overlay setup</h1>
+  <p>FACEIT doesn't officially expose a "current match" API, so the live overlay
+  reads directly from CS2 itself using Valve's <strong>Game State Integration</strong>
+  feature - your game client sends live match state straight to this server. This
+  only works for the CS2 client running on your own PC.</p>
+
+  <label for="token">Your overlay token (keep this private - it's like a password for your overlay)</label>
+  <input id="token" readonly />
+
+  <h2>1. Save this as a config file</h2>
+  <p>Create a file named <code>gamestate_integration_faceitoverlays.cfg</code> in:</p>
+  <div class="box" id="cfgPath"></div>
+  <p>With this content:</p>
+  <div class="box" id="cfgContent"></div>
+
+  <h2>2. Restart CS2</h2>
+  <p>Fully close and reopen Counter-Strike 2 so it picks up the new config file.</p>
+
+  <h2>3. Add the overlays to OBS/Streamlabs</h2>
+  <p>Add a <strong>Browser Source</strong> for the live scoreboard:</p>
+  <div class="box" id="liveUrl"></div>
+  <p style="color:#9ba0a8;font-size:13px;">Suggested size: 380×70.</p>
+  <p>And another for match start/end alerts:</p>
+  <div class="box" id="alertsUrl"></div>
+  <p style="color:#9ba0a8;font-size:13px;">Suggested size: 320×90. Both are transparent and stay hidden until you're in a live match.</p>
+
+<script>
+  function randomToken() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  const tokenInput = document.getElementById('token');
+  tokenInput.value = randomToken();
+
+  function render() {
+    const token = tokenInput.value.trim() || 'YOUR-TOKEN';
+    const uri = `${location.origin}/gsi/${token}`;
+
+    document.getElementById('cfgPath').textContent =
+      'Steam\\steamapps\\common\\Counter-Strike Global Offensive\\game\\csgo\\cfg\\';
+
+    document.getElementById('cfgContent').textContent = `"FaceitOverlays GSI"
+{
+  "uri" "${uri}"
+  "timeout" "5.0"
+  "buffer"  "0.1"
+  "throttle" "0.5"
+  "heartbeat" "30.0"
+  "data"
+  {
+    "provider"      "1"
+    "map"           "1"
+    "round"         "1"
+    "player_id"     "1"
+    "player_state"  "1"
+    "allplayers_id" "1"
+  }
+}`;
+
+    document.getElementById('liveUrl').textContent = `${location.origin}/live.html?token=${token}`;
+    document.getElementById('alertsUrl').textContent = `${location.origin}/alerts.html?token=${token}`;
+  }
+
+  tokenInput.addEventListener('input', render);
+  render();
+</script>
+</body>
+</html>

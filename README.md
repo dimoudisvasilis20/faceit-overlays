@@ -32,25 +32,44 @@ have transparent backgrounds, so no chroma key is needed.
 
 - `mini.html` — level ring + ELO only, suggested size 200×60
 - `compact.html` — level, nickname, ELO(+delta), today's wins/losses, suggested size 320×70
-- `stats.html` — everything above plus K/D and win rate, suggested size 460×90
-- `live.html` — live match scoreboard, suggested size 380×70
-- `alerts.html` — match-started / match-ended toast, suggested size 320×90 (stays invisible otherwise)
+- `stats.html` — everything above plus K/D, win rate, HS%, ADR, avg kills, suggested size 560×90
+
+Live match + start/end alerts (`live.html`, `alerts.html`) work differently —
+see below.
 
 If you only stream one FACEIT account, set `DEFAULT_NICKNAME` in `.env` and
 drop the `?nickname=` query param entirely.
+
+## Live match + start/end alerts (CS2 GSI)
+
+FACEIT has no official API for "what match is this player in right now" - the
+only endpoint that exposes it is an internal, undocumented one used by
+faceit.com's own website, and it's protected by Cloudflare bot-detection that
+blocks non-browser HTTP clients (including this server) regardless of
+headers. Rather than fight that, `live.html` and `alerts.html` read live
+match state directly from the CS2 client itself via Valve's **Game State
+Integration** feature - richer data, zero dependency on FACEIT, and it can't
+be blocked by anti-bot tooling since it's an official first-party feature.
+
+This only works for the CS2 client on your own PC (GSI is inherently local -
+it's the game reporting on itself), so it's a one-time setup separate from
+the FACEIT-nickname-based overlays above:
+
+1. Open `/gsi-setup.html` on your deployment - it generates a private token
+   and the exact `gamestate_integration_*.cfg` file content for you.
+2. Save that file into CS2's `game/csgo/cfg/` folder and restart CS2.
+3. Add the generated `live.html?token=...` and `alerts.html?token=...` URLs
+   as Browser Sources.
+
+`src/gsi.js` holds the latest state per token in memory (no database) and
+treats it as stale/not-live after 45s without an update from the game.
 
 ## Notes & limitations
 
 - **Player stats** use FACEIT's official Data API and are reliable, refreshed
   every ~20-30s (cached server-side to stay well under rate limits).
-- **Live match** detection uses an *undocumented* endpoint that powers the
-  "LIVE" badge on faceit.com profiles — FACEIT does not officially expose a
-  "current match" endpoint. It can stop working without notice; if it does,
-  `live.html` will just stay hidden instead of erroring.
-- **Match-end results** come from FACEIT's official match history, so they
-  only appear once the match is fully finished and processed — `alerts.html`
-  retries for about 15s after detecting a match ended before giving up.
 - The server (`src/server.js`) is what keeps your API key off the page — the
   browser only ever talks to the server, never to FACEIT directly.
-- `/api/*` routes are rate-limited per IP (`src/rateLimit.js`) since every
-  visitor's requests draw from the same shared FACEIT API key/quota.
+- `/api/*` routes (except `/api/gsi/:token`, which never calls FACEIT) are
+  rate-limited per IP (`src/rateLimit.js`) since every visitor's requests
+  draw from the same shared FACEIT API key/quota.

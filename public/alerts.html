@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<title>FACEIT Match Alerts</title>
+<title>CS2 Match Alerts</title>
 <link rel="stylesheet" href="shared.css" />
 <style>
   body { padding: 12px; }
@@ -15,15 +15,14 @@
     <div id="sub" class="toast-sub"></div>
   </div>
 
-<script src="overlay-common.js"></script>
 <script>
   const params = new URLSearchParams(location.search);
-  const nickname = params.get('nickname');
-  const pollMs = Number(params.get('refresh')) || 10_000;
+  const token = params.get('token');
+  const pollMs = Number(params.get('refresh')) || 3_000;
   const displayMs = Number(params.get('duration')) || 8_000;
   const el = (id) => document.getElementById(id);
 
-  let wasLive = null;
+  let wasPhase = null;
   let hideTimer = null;
 
   function showToast() {
@@ -32,44 +31,49 @@
     hideTimer = setTimeout(() => el('card').classList.remove('show'), displayMs);
   }
 
-  function showMatchStart(live) {
+  function showMatchStart(state) {
+    const opponents = (state.players || [])
+      .filter((p) => p.team && p.team !== state.playerTeam && p.name)
+      .map((p) => p.name);
+
     el('title').textContent = 'Match started';
     el('main').className = 'toast-main';
-    el('main').textContent = live.map || 'Map TBD';
-    el('sub').textContent = live.otherTeam?.name ? 'vs ' + live.otherTeam.name : '';
+    el('main').textContent = (state.map || 'Map TBD').replace(/^de_/, '');
+    el('sub').textContent = opponents.length ? 'vs ' + opponents.slice(0, 5).join(', ') : '';
     showToast();
   }
 
-  async function showMatchEnd() {
-    // Match history can lag a few seconds right as the match closes.
-    for (let attempt = 0; attempt < 4; attempt++) {
-      const result = await fetchOverlayJSON('/api/lastmatch', nickname).catch(() => null);
-      if (result?.found) {
-        el('title').textContent = 'Match ended';
-        el('main').className = 'toast-main ' + (result.won ? 'win' : 'loss');
-        el('main').textContent = (result.won ? 'VICTORY' : 'DEFEAT') +
-          (result.myScore != null ? ' ' + result.myScore + '-' + result.otherScore : '');
-        el('sub').textContent = '';
-        showToast();
-        return;
-      }
-      await new Promise((resolve) => setTimeout(resolve, 3000));
-    }
+  function showMatchEnd(state) {
+    const ct = state.ctScore ?? 0;
+    const t = state.tScore ?? 0;
+    const winnerSide = ct === t ? null : ct > t ? 'CT' : 'T';
+    const won = winnerSide != null && state.playerTeam === winnerSide;
+
+    el('title').textContent = 'Match ended';
+    el('main').className = 'toast-main ' + (won ? 'win' : 'loss');
+    el('main').textContent = (won ? 'VICTORY' : 'DEFEAT') + ' ' + ct + '-' + t;
+    el('sub').textContent = '';
+    showToast();
   }
 
   async function poll() {
+    if (!token) return;
     try {
-      const live = await fetchOverlayJSON('/api/live', nickname);
-      if (wasLive === null) {
-        wasLive = live.live;
+      const res = await fetch(`/api/gsi/${encodeURIComponent(token)}`);
+      const state = await res.json();
+      const phase = state.live ? state.phase : null;
+
+      if (wasPhase === null) {
+        wasPhase = phase;
         return;
       }
-      if (!wasLive && live.live) {
-        showMatchStart(live);
-      } else if (wasLive && !live.live) {
-        showMatchEnd();
+
+      if (wasPhase !== 'live' && phase === 'live') {
+        showMatchStart(state);
+      } else if (wasPhase === 'live' && phase === 'gameover') {
+        showMatchEnd(state);
       }
-      wasLive = live.live;
+      wasPhase = phase;
     } catch {
       // Transient error - keep last known state and try again next poll.
     }
