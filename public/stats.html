@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FACEIT Stats Overlay</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  body { padding: 12px; }
+</style>
+</head>
+<body>
+  <div id="card" class="card hidden">
+    <div id="level" class="level-badge">-</div>
+    <img id="avatar" class="avatar" src="" alt="" />
+    <div>
+      <div id="nickname" class="nickname">-</div>
+      <div id="elo" class="elo">- ELO</div>
+    </div>
+    <div class="divider"></div>
+    <div class="stat">
+      <div id="kd" class="stat-value">-</div>
+      <div class="stat-label">K/D</div>
+    </div>
+    <div class="stat">
+      <div id="winrate" class="stat-value">-</div>
+      <div class="stat-label">Win %</div>
+    </div>
+    <div class="stat">
+      <div id="matches" class="stat-value">-</div>
+      <div class="stat-label">Matches</div>
+    </div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const nickname = params.get('nickname');
+  const refreshMs = Number(params.get('refresh')) || 30_000;
+
+  const levelColors = {
+    1: '#eeeeee', 2: '#eeeeee', 3: '#a1e75b', 4: '#a1e75b',
+    5: '#f7b420', 6: '#f7b420', 7: '#f7b420',
+    8: '#fc5f5f', 9: '#fc5f5f', 10: '#ff5500',
+  };
+
+  const el = (id) => document.getElementById(id);
+
+  async function refresh() {
+    try {
+      const url = '/api/player' + (nickname ? `?nickname=${encodeURIComponent(nickname)}` : '');
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('bad response');
+      const data = await res.json();
+
+      el('nickname').textContent = data.nickname;
+      el('elo').textContent = (data.elo ?? '-') + ' ELO';
+      el('avatar').src = data.avatar || '';
+      el('level').textContent = data.level ?? '-';
+      el('level').style.background = levelColors[data.level] || '#666';
+      el('kd').textContent = data.stats.kd ?? '-';
+      el('winrate').textContent = data.stats.winRatePct != null ? data.stats.winRatePct + '%' : '-';
+      el('matches').textContent = data.stats.matches ?? '-';
+
+      el('card').classList.remove('hidden');
+    } catch {
+      el('card').classList.add('hidden');
+    }
+  }
+
+  refresh();
+  setInterval(refresh, refreshMs);
+</script>
+</body>
+</html>

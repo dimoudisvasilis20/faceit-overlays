@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FACEIT Live Match Overlay</title>
+<link rel="stylesheet" href="shared.css" />
+<style>
+  body { padding: 12px; }
+  .map-tag {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: var(--text-dim);
+  }
+  .score-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 20px;
+    font-weight: 700;
+  }
+  .team-name {
+    font-size: 13px;
+    font-weight: 600;
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .score {
+    font-size: 22px;
+    color: var(--accent);
+  }
+  .vs {
+    color: var(--text-dim);
+    font-size: 14px;
+  }
+</style>
+</head>
+<body>
+  <div id="card" class="card hidden">
+    <div>
+      <div class="map-tag" id="map">MAP</div>
+      <div class="score-row">
+        <span class="team-name" id="teamA">Team A</span>
+        <span class="score" id="scoreA">-</span>
+        <span class="vs">:</span>
+        <span class="score" id="scoreB">-</span>
+        <span class="team-name" id="teamB">Team B</span>
+      </div>
+    </div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const nickname = params.get('nickname');
+  const refreshMs = Number(params.get('refresh')) || 20_000;
+
+  const el = (id) => document.getElementById(id);
+
+  async function refresh() {
+    try {
+      const url = '/api/live' + (nickname ? `?nickname=${encodeURIComponent(nickname)}` : '');
+      const res = await fetch(url);
+      if (!res.ok) throw new Error('bad response');
+      const data = await res.json();
+
+      if (!data.live) {
+        el('card').classList.add('hidden');
+        return;
+      }
+
+      el('map').textContent = data.map || 'LIVE';
+      el('teamA').textContent = data.myTeam?.name ?? 'Team A';
+      el('teamB').textContent = data.otherTeam?.name ?? 'Team B';
+      el('scoreA').textContent = data.myTeam?.score ?? '-';
+      el('scoreB').textContent = data.otherTeam?.score ?? '-';
+
+      el('card').classList.remove('hidden');
+    } catch {
+      el('card').classList.add('hidden');
+    }
+  }
+
+  refresh();
+  setInterval(refresh, refreshMs);
+</script>
+</body>
+</html>

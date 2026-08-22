@@ -1,0 +1,98 @@
+@font-face {
+  font-family: 'Rajdhani';
+  src: local('Rajdhani');
+}
+
+:root {
+  --bg-panel: rgba(15, 17, 21, 0.88);
+  --border: rgba(255, 85, 0, 0.55);
+  --accent: #ff5500;
+  --text: #f5f6f7;
+  --text-dim: #9ba0a8;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  font-family: 'Rajdhani', 'Segoe UI', Arial, sans-serif;
+  color: var(--text);
+  overflow: hidden;
+}
+
+.hidden { opacity: 0 !important; }
+
+.card {
+  transition: opacity 0.4s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg-panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 18px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  backdrop-filter: blur(4px);
+}
+
+.level-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 18px;
+  color: #101114;
+  flex-shrink: 0;
+}
+
+.avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--accent);
+  flex-shrink: 0;
+  background: #222;
+}
+
+.nickname {
+  font-weight: 700;
+  font-size: 20px;
+  letter-spacing: 0.3px;
+}
+
+.elo {
+  font-size: 14px;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 52px;
+}
+
+.stat-value {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.stat-label {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--text-dim);
+}
+
+.divider {
+  width: 1px;
+  align-self: stretch;
+  background: rgba(255, 255, 255, 0.12);
+}
