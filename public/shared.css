@@ -16,7 +16,8 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: transparent;
+  background: transparent !important;
+  background-color: rgba(0, 0, 0, 0) !important;
   font-family: 'Rajdhani', 'Segoe UI', Arial, sans-serif;
   color: var(--text);
   overflow: hidden;
