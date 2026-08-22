@@ -10,11 +10,20 @@
 </head>
 <body>
   <div id="card" class="card hidden">
-    <div id="level" class="level-badge">-</div>
+    <div class="level-ring" id="levelRing">
+      <svg viewBox="0 0 48 48">
+        <circle class="track" cx="24" cy="24" r="20"></circle>
+        <circle class="progress" id="ringProgress" cx="24" cy="24" r="20"></circle>
+      </svg>
+      <div class="level-number" id="level">-</div>
+    </div>
     <img id="avatar" class="avatar" src="" alt="" />
     <div>
       <div id="nickname" class="nickname">-</div>
-      <div id="elo" class="elo">- ELO</div>
+      <div class="elo-block">
+        <span id="elo" class="elo">- ELO</span>
+        <span id="eloDelta" class="elo-delta hidden"></span>
+      </div>
     </div>
     <div class="divider"></div>
     <div class="stat">
@@ -25,9 +34,16 @@
       <div id="winrate" class="stat-value">-</div>
       <div class="stat-label">Win %</div>
     </div>
-    <div class="stat">
-      <div id="matches" class="stat-value">-</div>
-      <div class="stat-label">Matches</div>
+    <div class="divider"></div>
+    <div class="record">
+      <div class="pill win">
+        <div id="winsToday" class="pill-value">0</div>
+        <div class="pill-label">Wins</div>
+      </div>
+      <div class="pill loss">
+        <div id="lossesToday" class="pill-value">0</div>
+        <div class="pill-label">Losses</div>
+      </div>
     </div>
   </div>
 
@@ -35,30 +51,83 @@
   const params = new URLSearchParams(location.search);
   const nickname = params.get('nickname');
   const refreshMs = Number(params.get('refresh')) || 30_000;
+  const nsKey = 'faceit-overlay-baseline-elo:' + (nickname || 'default');
 
-  const levelColors = {
-    1: '#eeeeee', 2: '#eeeeee', 3: '#a1e75b', 4: '#a1e75b',
+  // level -> [minElo, maxElo] (max is exclusive lower bound of next level).
+  // Level 10 has no ceiling, so it always renders a full ring.
+  const LEVEL_RANGES = {
+    1: [100, 501], 2: [501, 751], 3: [751, 901], 4: [901, 1051],
+    5: [1051, 1201], 6: [1201, 1351], 7: [1351, 1531], 8: [1531, 1751],
+    9: [1751, 2001], 10: [2001, null],
+  };
+  const LEVEL_COLORS = {
+    1: '#cfcfcf', 2: '#cfcfcf', 3: '#a1e75b', 4: '#a1e75b',
     5: '#f7b420', 6: '#f7b420', 7: '#f7b420',
     8: '#fc5f5f', 9: '#fc5f5f', 10: '#ff5500',
   };
 
   const el = (id) => document.getElementById(id);
+  const RADIUS = 20;
+  const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
+  el('ringProgress').style.strokeDasharray = String(CIRCUMFERENCE);
+
+  let baselineElo = Number(sessionStorage.getItem(nsKey)) || null;
+
+  function renderRing(level, elo) {
+    const range = LEVEL_RANGES[level];
+    const color = LEVEL_COLORS[level] || '#666';
+    el('ringProgress').style.stroke = color;
+    el('level').style.color = color;
+
+    let fraction = 1;
+    if (range && range[1] != null) {
+      fraction = (elo - range[0]) / (range[1] - range[0]);
+      fraction = Math.max(0, Math.min(1, fraction));
+    }
+    const offset = CIRCUMFERENCE * (1 - fraction);
+    el('ringProgress').style.strokeDashoffset = String(offset);
+  }
+
+  function renderEloDelta(elo) {
+    if (baselineElo == null) {
+      baselineElo = elo;
+      sessionStorage.setItem(nsKey, String(elo));
+    }
+    const delta = elo - baselineElo;
+    const badge = el('eloDelta');
+    if (delta === 0) {
+      badge.classList.add('hidden');
+      return;
+    }
+    badge.classList.remove('hidden', 'up', 'down');
+    badge.classList.add(delta > 0 ? 'up' : 'down');
+    badge.textContent = (delta > 0 ? '+' : '') + delta;
+  }
 
   async function refresh() {
     try {
-      const url = '/api/player' + (nickname ? `?nickname=${encodeURIComponent(nickname)}` : '');
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('bad response');
-      const data = await res.json();
+      const qs = nickname ? `?nickname=${encodeURIComponent(nickname)}` : '';
+      const [playerRes, todayRes] = await Promise.all([
+        fetch('/api/player' + qs),
+        fetch('/api/today' + qs),
+      ]);
+      if (!playerRes.ok) throw new Error('bad response');
+      const data = await playerRes.json();
+      const today = todayRes.ok ? await todayRes.json() : { wins: 0, losses: 0 };
 
       el('nickname').textContent = data.nickname;
       el('elo').textContent = (data.elo ?? '-') + ' ELO';
       el('avatar').src = data.avatar || '';
       el('level').textContent = data.level ?? '-';
-      el('level').style.background = levelColors[data.level] || '#666';
       el('kd').textContent = data.stats.kd ?? '-';
       el('winrate').textContent = data.stats.winRatePct != null ? data.stats.winRatePct + '%' : '-';
-      el('matches').textContent = data.stats.matches ?? '-';
+      el('winsToday').textContent = today.wins ?? 0;
+      el('lossesToday').textContent = today.losses ?? 0;
+
+      if (data.level != null && data.elo != null) {
+        renderRing(data.level, data.elo);
+        renderEloDelta(data.elo);
+      }
 
       el('card').classList.remove('hidden');
     } catch {

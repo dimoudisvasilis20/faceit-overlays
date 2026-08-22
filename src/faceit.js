@@ -68,6 +68,32 @@ export async function getPlayerSummary(nickname) {
   };
 }
 
+export async function getTodaySummary(nickname) {
+  const player = await getPlayerByNickname(nickname);
+  const playerId = player.player_id;
+  const now = Math.floor(Date.now() / 1000);
+  const startOfDay = now - (now % 86400); // UTC day boundary
+
+  return cached(`today:${playerId}:${startOfDay}`, 30_000, async () => {
+    const history = await dataApiGet(
+      `/players/${playerId}/history?game=${GAME_ID}&from=${startOfDay}&to=${now}&limit=50`
+    ).catch(() => ({ items: [] }));
+
+    let wins = 0;
+    let losses = 0;
+    for (const match of history.items || []) {
+      if (match.status !== 'finished') continue;
+      const inFaction1 = match.teams?.faction1?.players?.some((p) => p.player_id === playerId);
+      const inFaction2 = match.teams?.faction2?.players?.some((p) => p.player_id === playerId);
+      const myFaction = inFaction1 ? 'faction1' : inFaction2 ? 'faction2' : null;
+      if (!myFaction) continue;
+      if (match.results?.winner === myFaction) wins += 1;
+      else losses += 1;
+    }
+    return { wins, losses };
+  });
+}
+
 // Best-effort live-match detection using FACEIT's public web API (the same
 // call faceit.com uses to show the "LIVE" badge on a profile). This is NOT
 // part of the official documented Data API, has no key/auth, and can change
