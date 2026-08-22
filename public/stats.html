@@ -40,7 +40,7 @@
       </div>
     </div>
     <div class="divider-h"></div>
-    <div class="card-row">
+    <div class="card-row" style="flex-wrap: wrap; row-gap: 8px;">
       <div class="stat">
         <div id="kd" class="stat-value">-</div>
         <div class="stat-label">K/D</div>
@@ -56,6 +56,14 @@
       <div class="stat">
         <div id="matches" class="stat-value">-</div>
         <div class="stat-label">Matches</div>
+      </div>
+      <div class="stat">
+        <div id="adr" class="stat-value">-</div>
+        <div class="stat-label">ADR</div>
+      </div>
+      <div class="stat">
+        <div id="avgKills" class="stat-value">-</div>
+        <div class="stat-label">AVG</div>
       </div>
     </div>
   </div>
@@ -95,6 +103,8 @@
       el('winrate').textContent = data.stats.winRatePct != null ? data.stats.winRatePct + '%' : '-';
       el('hs').textContent = data.stats.headshotPct != null ? data.stats.headshotPct + '%' : '-';
       el('matches').textContent = data.stats.matches ?? '-';
+      el('adr').textContent = data.stats.adr ?? '-';
+      el('avgKills').textContent = data.stats.avgKills ?? '-';
       el('winsToday').textContent = today.wins ?? 0;
       el('lossesToday').textContent = today.losses ?? 0;
 

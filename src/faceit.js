@@ -49,6 +49,10 @@ export async function getPlayerSummary(nickname) {
   const stats = await getPlayerStats(player.player_id).catch(() => null);
   const lifetime = stats?.lifetime ?? {};
 
+  const totalKills = Number(lifetime['Total Kills with extended stats']);
+  const totalMatches = Number(lifetime['Total Matches']);
+  const avgKills = totalKills && totalMatches ? Math.round((totalKills / totalMatches) * 10) / 10 : null;
+
   return {
     nickname: player.nickname,
     avatar: player.avatar || null,
@@ -64,6 +68,8 @@ export async function getPlayerSummary(nickname) {
       headshotPct: lifetime['Average Headshots %'] ?? null,
       currentWinStreak: lifetime['Current Win Streak'] ?? null,
       longestWinStreak: lifetime['Longest Win Streak'] ?? null,
+      adr: lifetime['ADR'] ?? null,
+      avgKills,
     },
   };
 }
