@@ -189,6 +189,18 @@ html, body {
   background: rgba(255, 255, 255, 0.12);
 }
 
+.divider-h {
+  height: 1px;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.card-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
 .toast {
   opacity: 0;
   transform: translateY(-8px);

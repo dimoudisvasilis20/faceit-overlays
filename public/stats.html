@@ -6,43 +6,48 @@
 <link rel="stylesheet" href="shared.css" />
 <style>
   body { padding: 12px; }
+  #card { flex-direction: column; align-items: stretch; gap: 10px; }
 </style>
 </head>
 <body>
   <div id="card" class="card hidden">
-    <div class="level-ring">
-      <svg viewBox="0 0 48 48">
-        <circle class="track" cx="24" cy="24" r="20"></circle>
-        <circle class="progress" id="ringProgress" cx="24" cy="24" r="20"></circle>
-      </svg>
-      <div class="level-number" id="level">-</div>
-    </div>
-    <img id="avatar" class="avatar" src="" alt="" />
-    <div>
-      <div id="nickname" class="nickname">-</div>
-      <div class="elo-block">
-        <span id="elo" class="elo">- ELO</span>
-        <span id="eloDelta" class="elo-delta hidden"></span>
+    <div class="card-row">
+      <div class="level-ring">
+        <svg viewBox="0 0 48 48">
+          <circle class="track" cx="24" cy="24" r="20"></circle>
+          <circle class="progress" id="ringProgress" cx="24" cy="24" r="20"></circle>
+        </svg>
+        <div class="level-number" id="level">-</div>
+      </div>
+      <img id="avatar" class="avatar" src="" alt="" />
+      <div>
+        <div id="nickname" class="nickname">-</div>
+        <div class="elo-block">
+          <span id="elo" class="elo">- ELO</span>
+          <span id="eloDelta" class="elo-delta hidden"></span>
+        </div>
       </div>
     </div>
-    <div class="divider"></div>
-    <div class="stat">
-      <div id="kd" class="stat-value">-</div>
-      <div class="stat-label">K/D</div>
-    </div>
-    <div class="stat">
-      <div id="winrate" class="stat-value">-</div>
-      <div class="stat-label">Win %</div>
-    </div>
-    <div class="divider"></div>
-    <div class="record">
-      <div class="pill win">
-        <div id="winsToday" class="pill-value">0</div>
-        <div class="pill-label">Wins</div>
+    <div class="divider-h"></div>
+    <div class="card-row">
+      <div class="stat">
+        <div id="kd" class="stat-value">-</div>
+        <div class="stat-label">K/D</div>
       </div>
-      <div class="pill loss">
-        <div id="lossesToday" class="pill-value">0</div>
-        <div class="pill-label">Losses</div>
+      <div class="stat">
+        <div id="winrate" class="stat-value">-</div>
+        <div class="stat-label">Win %</div>
+      </div>
+      <div class="divider"></div>
+      <div class="record">
+        <div class="pill win">
+          <div id="winsToday" class="pill-value">0</div>
+          <div class="pill-label">Wins</div>
+        </div>
+        <div class="pill loss">
+          <div id="lossesToday" class="pill-value">0</div>
+          <div class="pill-label">Losses</div>
+        </div>
       </div>
     </div>
   </div>
