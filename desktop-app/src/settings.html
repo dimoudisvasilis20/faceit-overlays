@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>FACEIT Overlay Relay</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #101114;
+    color: #f5f6f7;
+    margin: 0;
+    padding: 20px;
+  }
+  h1 { color: #ff5500; font-size: 18px; margin: 0 0 4px; }
+  p.sub { color: #9ba0a8; font-size: 12px; margin: 0 0 20px; }
+  label { display: block; margin-top: 14px; font-weight: 600; font-size: 13px; }
+  input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    margin-top: 4px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #1a1c20;
+    color: #fff;
+    font-size: 13px;
+  }
+  input[readonly] { color: #9ba0a8; }
+  button {
+    margin-top: 16px;
+    padding: 8px 16px;
+    border-radius: 6px;
+    border: none;
+    background: #ff5500;
+    color: #fff;
+    font-weight: 600;
+    cursor: pointer;
+    font-size: 13px;
+  }
+  button:hover { background: #e64d00; }
+  .box {
+    margin-top: 4px;
+    padding: 8px 10px;
+    background: #1a1c20;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 12px;
+    word-break: break-all;
+    user-select: all;
+  }
+  #status {
+    margin-top: 20px;
+    padding: 10px;
+    background: #1a1c20;
+    border-radius: 6px;
+    font-size: 12px;
+    color: #9ba0a8;
+  }
+  #status.live { color: #4ade80; }
+</style>
+</head>
+<body>
+  <h1>FACEIT Overlay Relay</h1>
+  <p class="sub">Runs quietly in the tray and finds your current match for roster.html.</p>
+
+  <label for="nickname">Your FACEIT nickname</label>
+  <input id="nickname" placeholder="e.g. droXen" />
+  <button id="save">Save</button>
+
+  <label>Overlay URL (paste into OBS/Streamlabs as a Browser Source)</label>
+  <div class="box" id="rosterUrl">-</div>
+
+  <div id="status">Waiting for nickname...</div>
+
+<script>
+  const nicknameInput = document.getElementById('nickname');
+  const rosterUrlBox = document.getElementById('rosterUrl');
+  const statusBox = document.getElementById('status');
+
+  async function init() {
+    const config = await window.relayApi.getConfig();
+    if (config.nickname) nicknameInput.value = config.nickname;
+    updateRosterUrl(config);
+  }
+
+  function updateRosterUrl(config) {
+    if (config.nickname && config.token) {
+      rosterUrlBox.textContent = `${config.server}/roster.html?nickname=${encodeURIComponent(config.nickname)}&token=${config.token}`;
+    } else {
+      rosterUrlBox.textContent = '-';
+    }
+  }
+
+  document.getElementById('save').addEventListener('click', async () => {
+    const nickname = nicknameInput.value.trim();
+    if (!nickname) return;
+    const config = await window.relayApi.saveNickname(nickname);
+    updateRosterUrl(config);
+  });
+
+  window.relayApi.onStatus((status) => {
+    statusBox.textContent = status;
+    statusBox.className = status.startsWith('Live match') ? 'live' : '';
+  });
+
+  init();
+</script>
+</body>
+</html>
