@@ -77,10 +77,9 @@
 
   <h2 style="color:#ff5500;font-size:18px;margin-top:32px;">Live match roster</h2>
   <p>Full-canvas overlay: your team pinned left, the enemy team pinned right,
-  map + average team ELO centered at the bottom. Best-effort - relies on an
-  undocumented FACEIT endpoint that could stop working without notice.</p>
-  <div class="url-box" id="rosterUrl"></div>
-  <p style="color:#9ba0a8;font-size:13px;">Size it to your whole stream canvas (e.g. 1920×1080).</p>
+  map + average team ELO centered at the bottom. Needs a one-time setup on
+  your own PC (a small script that looks up your current match).
+  <a href="/local-helper-setup.html">Set that up here →</a></p>
 
   <h2 style="color:#ff5500;font-size:18px;margin-top:32px;">Match start / end alerts</h2>
   <p>Reads directly from CS2 via Game State Integration instead - a one-time
@@ -89,7 +88,6 @@
 <script>
   const input = document.getElementById('nickname');
   const statsUrl = document.getElementById('statsUrl');
-  const rosterUrl = document.getElementById('rosterUrl');
   const styleInputs = document.querySelectorAll('input[name="style"]');
 
   function render() {
@@ -97,7 +95,6 @@
     const qs = nick ? `?nickname=${encodeURIComponent(nick)}` : '';
     const style = document.querySelector('input[name="style"]:checked').value;
     statsUrl.textContent = `${location.origin}/${style}.html${qs}`;
-    rosterUrl.textContent = `${location.origin}/roster.html${qs}`;
   }
 
   input.addEventListener('input', render);

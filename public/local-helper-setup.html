@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Live Match Roster Setup</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #101114;
+    color: #f5f6f7;
+    max-width: 680px;
+    margin: 40px auto;
+    padding: 0 20px;
+  }
+  h1 { color: #ff5500; }
+  h2 { font-size: 16px; margin-top: 28px; }
+  label { display: block; margin-top: 16px; font-weight: 600; }
+  input {
+    width: 100%;
+    padding: 8px 10px;
+    margin-top: 4px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: #1a1c20;
+    color: #fff;
+    font-size: 14px;
+  }
+  .box {
+    margin-top: 8px;
+    padding: 10px;
+    background: #1a1c20;
+    border: 1px solid #333;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: 13px;
+    white-space: pre-wrap;
+    word-break: break-all;
+    user-select: all;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  code { background: #1a1c20; padding: 1px 5px; border-radius: 4px; }
+  a { color: #ff5500; }
+</style>
+</head>
+<body>
+  <h1>Live match roster setup</h1>
+  <p>The full roster overlay (<code>roster.html</code>) needs to know which
+  FACEIT match you're currently in. FACEIT's own "current match" endpoint is
+  blocked for servers hosted on cloud platforms like Render, but works fine
+  from an ordinary home connection - so this one lookup runs on
+  <strong>your own PC</strong> instead, in a small script, and pushes the
+  result to the server.</p>
+
+  <label for="nickname">Your FACEIT nickname</label>
+  <input id="nickname" placeholder="e.g. droXen" />
+
+  <h2>1. Save this as a file</h2>
+  <p>Save the content below as <code>live-match-relay.mjs</code> anywhere on your PC.</p>
+  <div class="box" id="scriptContent"></div>
+
+  <h2>2. Run it whenever you stream</h2>
+  <p>Needs <a href="https://nodejs.org" target="_blank" rel="noopener">Node.js</a> installed (you already have this if you've used this project before). Open a terminal in the folder where you saved the file and run:</p>
+  <div class="box">node live-match-relay.mjs</div>
+  <p style="color:#9ba0a8;font-size:13px;">Leave it running in the background the whole time you're streaming. It only reads your own public match status - Ctrl+C to stop it any time.</p>
+
+  <h2>3. Add the overlay to OBS/Streamlabs</h2>
+  <div class="box" id="rosterUrl"></div>
+  <p style="color:#9ba0a8;font-size:13px;">Size it to your whole stream canvas (e.g. 1920×1080).</p>
+
+<script>
+  const STORAGE_KEY = 'faceit-overlays-gsi-token';
+
+  function randomToken() {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  const token = localStorage.getItem(STORAGE_KEY) || randomToken();
+  localStorage.setItem(STORAGE_KEY, token);
+
+  const nicknameInput = document.getElementById('nickname');
+
+  function render() {
+    const nickname = nicknameInput.value.trim() || 'YOUR-FACEIT-NICKNAME';
+    const server = location.origin;
+
+    document.getElementById('scriptContent').textContent = `// FACEIT live match relay - run locally: node live-match-relay.mjs
+// Looks up your current FACEIT match every 10s from this PC (where FACEIT's
+// bot-protection doesn't block the lookup) and reports it to the overlay
+// server. Needs Node.js 18+ and curl (curl.exe ships with Windows by default).
+
+const NICKNAME = ${JSON.stringify(nickname)};
+const TOKEN = ${JSON.stringify(token)};
+const SERVER = ${JSON.stringify(server)};
+const INTERVAL_MS = 10_000;
+
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const execFileAsync = promisify(execFile);
+
+async function curlJson(url) {
+  const { stdout } = await execFileAsync('curl', [
+    '-s', '-A', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+    '-H', 'Referer: https://www.faceit.com/en/players/',
+    '-H', 'Accept: application/json',
+    url,
+  ], { timeout: 8000, maxBuffer: 5 * 1024 * 1024 });
+  return JSON.parse(stdout);
+}
+
+let playerId = null;
+
+async function ensurePlayerId() {
+  if (playerId) return playerId;
+  const res = await fetch(\`\${SERVER}/api/player?nickname=\${encodeURIComponent(NICKNAME)}\`);
+  const data = await res.json();
+  if (!data.playerId) throw new Error('Could not resolve player id for ' + NICKNAME);
+  playerId = data.playerId;
+  return playerId;
+}
+
+async function tick() {
+  try {
+    const pid = await ensurePlayerId();
+    let matchId = null;
+    try {
+      const body = await curlJson(\`https://www.faceit.com/api/match/v1/matches/groupByState?userId=\${pid}\`);
+      const ongoing = body?.payload?.ONGOING;
+      matchId = Array.isArray(ongoing) ? ongoing[0]?.id ?? null : null;
+    } catch (err) {
+      console.error('lookup failed:', err.message);
+    }
+
+    await fetch(\`\${SERVER}/api/matchpush/\${TOKEN}\`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ matchId }),
+    });
+    console.log(new Date().toLocaleTimeString(), matchId ? \`live match: \${matchId}\` : 'no live match');
+  } catch (err) {
+    console.error('tick failed:', err.message);
+  }
+}
+
+console.log('FACEIT live match relay running for', NICKNAME, '- Ctrl+C to stop.');
+tick();
+setInterval(tick, INTERVAL_MS);
+`;
+
+    document.getElementById('rosterUrl').textContent =
+      `${server}/roster.html?nickname=${encodeURIComponent(nickname)}&token=${token}`;
+  }
+
+  nicknameInput.addEventListener('input', render);
+  render();
+</script>
+</body>
+</html>

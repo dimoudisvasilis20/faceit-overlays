@@ -47,16 +47,40 @@ drop the `?nickname=` query param entirely.
 FACEIT has no *documented* API for "what match is this player in right now."
 Two different workarounds cover different overlays:
 
-**`roster.html`** calls an internal, undocumented FACEIT endpoint
-(`getLiveMatchId` in `src/faceit.js`) to find the current match, then pulls
-the full roster/score/map from the official Data API. That internal endpoint
-sits behind Cloudflare bot-protection that blocks Node's built-in `fetch`
-specifically by TLS fingerprint (confirmed by testing: identical requests
-succeed via `curl` and get a 403 via `fetch`) - so this call shells out to
-`curl` instead. It's inherently best-effort: FACEIT could block `curl`'s
-fingerprint too, without notice, at any time, and every caller here treats
-failures as "no live match" rather than an error. Requires `curl` to be on
-the server's `PATH` (present by default on Render and most Linux hosts).
+**`roster.html`** needs to find the streamer's current match id, then pulls
+the full roster/score/map from the official Data API (no restrictions once
+you have a match id). Finding that match id is the hard part: FACEIT's own
+website calls an internal, undocumented endpoint for it
+(`groupByState` - see `local-helper/live-match-relay.mjs`), which sits behind
+Cloudflare bot-protection. Testing ruled out two easier fixes before landing
+here:
+  - Node's built-in `fetch` gets a 403 where `curl` with identical headers
+    gets 200 - a TLS-fingerprint false positive - but shelling out to `curl`
+    from the server *still* gets challenged, because...
+  - ...the block is IP-reputation-based, not just fingerprint-based: the same
+    `curl` call that succeeds from an ordinary home connection gets an
+    interactive Cloudflare "Just a moment" challenge page from Render's
+    (datacenter) IP. That's not something to script around - it's a real
+    challenge meant to stop exactly this kind of automated request.
+
+So the match-id lookup runs on **the streamer's own PC** instead, where nothing is
+being bypassed - it's just an ordinary request from an ordinary residential
+connection, same as opening a browser at home:
+
+1. Open `/local-helper-setup.html` on your deployment - it generates a
+   private token and a standalone script (`live-match-relay.mjs`).
+2. Run `node live-match-relay.mjs` on your PC while streaming. Every ~10s it
+   looks up your current match (via `curl`, same reasoning as the Node/fetch
+   fingerprint issue above) and POSTs the match id (or `null`) to
+   `/api/matchpush/:token`.
+3. `roster.html?nickname=...&token=...` polls the server, which uses
+   whatever match id was last pushed (treated as stale after 30s) to build
+   the roster from the official Data API. No Cloudflare-blocked call ever
+   happens server-side.
+
+This is inherently best-effort: if the streamer's helper script isn't
+running, or FACEIT changes the internal endpoint, `roster.html` just shows
+nothing rather than erroring.
 
 **`alerts.html`** instead reads live match state directly from the CS2
 client via Valve's **Game State Integration** feature. This is what

@@ -2,9 +2,9 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { execFile } from 'node:child_process';
 import { getPlayerSummary, getTodaySummary, getLiveMatchRoster } from './faceit.js';
 import { ingestGsiPayload, getGsiState } from './gsi.js';
+import { ingestMatchPush, getPushedMatchId } from './matchPush.js';
 import { rateLimit } from './rateLimit.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -31,6 +31,14 @@ app.post('/gsi/:token', (req, res) => {
 
 app.get('/api/gsi/:token', (req, res) => {
   res.json(getGsiState(req.params.token));
+});
+
+// The streamer's local live-match-relay script posts here (see
+// local-helper/live-match-relay.js) - cheap in-memory write, not a call to
+// FACEIT, so it doesn't need the shared-quota rate limit below either.
+app.post('/api/matchpush/:token', (req, res) => {
+  ingestMatchPush(req.params.token, req.body?.matchId);
+  res.sendStatus(200);
 });
 
 app.use('/api', rateLimit);
@@ -61,38 +69,18 @@ app.get('/api/today', async (req, res) => {
 
 app.get('/api/liveroster', async (req, res) => {
   const nickname = resolveNickname(req);
+  const token = req.query.token;
   if (!nickname) {
     return res.status(400).json({ error: 'Missing ?nickname= and no DEFAULT_NICKNAME set' });
   }
+  if (!token) {
+    return res.status(400).json({ error: 'Missing ?token= - run local-helper/live-match-relay.js' });
+  }
   try {
-    res.json(await getLiveMatchRoster(nickname));
+    res.json(await getLiveMatchRoster(nickname, getPushedMatchId(token)));
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
-});
-
-// TEMPORARY diagnostic route - remove once the curl-on-Render question is settled.
-app.get('/api/debugcurl', (req, res) => {
-  const userId = req.query.userId || '0e72edb6-a398-43ce-9fc6-a87c0f7d59cc';
-  execFile(
-    'curl',
-    [
-      '-s',
-      '-A',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      '-H',
-      'Referer: https://www.faceit.com/en/players/',
-      '-H',
-      'Accept: application/json',
-      '-w',
-      '\n__STATUS__%{http_code}',
-      `https://www.faceit.com/api/match/v1/matches/groupByState?userId=${userId}`,
-    ],
-    { timeout: 8000, maxBuffer: 5 * 1024 * 1024 },
-    (err, stdout, stderr) => {
-      res.json({ err: err ? { message: err.message, code: err.code } : null, stdout: stdout.slice(0, 1000), stderr });
-    }
-  );
 });
 
 app.listen(PORT, () => {

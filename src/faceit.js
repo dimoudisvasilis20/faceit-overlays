@@ -1,8 +1,3 @@
-import { execFile } from 'node:child_process';
-import { promisify } from 'node:util';
-
-const execFileAsync = promisify(execFile);
-
 const DATA_API = 'https://open.faceit.com/data/v4';
 const GAME_ID = 'cs2';
 
@@ -56,6 +51,7 @@ async function summarizePlayer(player) {
   const avgKills = totalKills && totalMatches ? Math.round((totalKills / totalMatches) * 10) / 10 : null;
 
   return {
+    playerId: player.player_id,
     nickname: player.nickname,
     avatar: player.avatar || null,
     country: player.country || null,
@@ -83,46 +79,6 @@ export async function getPlayerSummary(nickname) {
     throw new Error(`Player "${nickname}" has no ${GAME_ID} data on FACEIT`);
   }
   return summary;
-}
-
-// FACEIT's own website calls an internal, undocumented endpoint to show
-// "current match" state, but it's behind Cloudflare bot-protection that
-// blocks Node's built-in fetch (undici) specifically by TLS fingerprint -
-// confirmed by testing: identical headers succeed via curl and fail via
-// fetch with a 403. Shelling out to curl for just this one call sidesteps
-// that false positive without spoofing anything curl doesn't already send
-// by default. Still best-effort: FACEIT could block curl's fingerprint too,
-// with no warning, at any time - every caller must treat failures as
-// "no live match" rather than an error.
-async function curlJson(url, extraHeaders = {}) {
-  const headerArgs = Object.entries(extraHeaders).flatMap(([k, v]) => ['-H', `${k}: ${v}`]);
-  const { stdout } = await execFileAsync(
-    'curl',
-    [
-      '-s',
-      '-A',
-      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
-      ...headerArgs,
-      url,
-    ],
-    { timeout: 8000, maxBuffer: 5 * 1024 * 1024 }
-  );
-  return JSON.parse(stdout);
-}
-
-async function getLiveMatchId(playerId) {
-  return cached(`livematchid:${playerId}`, 8_000, async () => {
-    try {
-      const body = await curlJson(
-        `https://www.faceit.com/api/match/v1/matches/groupByState?userId=${playerId}`,
-        { Referer: 'https://www.faceit.com/en/players/', Accept: 'application/json' }
-      );
-      const ongoing = body?.payload?.ONGOING;
-      return Array.isArray(ongoing) ? ongoing[0]?.id ?? null : null;
-    } catch {
-      return null;
-    }
-  });
 }
 
 export async function getPlayerById(playerId) {
@@ -157,14 +113,20 @@ async function summarizeRosterMember(rosterEntry) {
   };
 }
 
-// Full roster + live score for whatever match `nickname` is currently in,
-// sourced entirely from FACEIT (official Data API for match/player details,
-// the curl workaround above only to discover the match id). Unlike the GSI
-// allplayers approach, this has no "must be spectating" restriction, so it
+// Full roster + live score for a match, given its id. FACEIT's own website
+// calls an internal, undocumented endpoint to discover "current match id"
+// for a player, but it's behind Cloudflare bot-protection that challenges
+// requests from datacenter IPs (confirmed by testing: the same request
+// succeeds from a home connection and gets a Cloudflare interactive
+// challenge page from Render) - not something fixable with headers or a
+// different HTTP client. So match-id discovery happens on the streamer's
+// own PC instead (see local-helper/) and gets pushed to /api/matchpush/:token;
+// this function just takes whatever id it was given and builds the roster
+// from the official Data API, which has no such restriction and, unlike the
+// GSI allplayers approach, no "must be spectating" restriction either - it
 // works continuously for the whole match.
-export async function getLiveMatchRoster(nickname) {
+export async function getLiveMatchRoster(nickname, matchId) {
   const player = await getPlayerByNickname(nickname);
-  const matchId = await getLiveMatchId(player.player_id);
   if (!matchId) return { live: false };
 
   const match = await dataApiGet(`/matches/${matchId}`).catch(() => null);

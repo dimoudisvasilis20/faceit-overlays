@@ -83,6 +83,7 @@
 <script>
   const params = new URLSearchParams(location.search);
   const nickname = params.get('nickname');
+  const token = params.get('token');
   const pollMs = Number(params.get('refresh')) || 15_000;
   const wrapEl = document.getElementById('wrap');
 
@@ -150,9 +151,11 @@
   }
 
   async function poll() {
-    if (!nickname) return;
+    if (!nickname || !token) return;
     try {
-      const res = await fetch(`/api/liveroster?nickname=${encodeURIComponent(nickname)}`);
+      const res = await fetch(
+        `/api/liveroster?nickname=${encodeURIComponent(nickname)}&token=${encodeURIComponent(token)}`
+      );
       const data = await res.json();
       render(data);
     } catch {
