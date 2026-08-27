@@ -62,13 +62,15 @@
   <h2>2. Restart CS2</h2>
   <p>Fully close and reopen Counter-Strike 2 so it picks up the new config file.</p>
 
-  <h2>3. Add the overlays to OBS/Streamlabs</h2>
+  <h2>3. Add the overlay to OBS/Streamlabs</h2>
   <p>Add a <strong>Browser Source</strong> for match start/end alerts:</p>
   <div class="box" id="alertsUrl"></div>
   <p style="color:#9ba0a8;font-size:13px;">Suggested size: 320×90. Transparent, and invisible except for a few seconds when a match starts or ends.</p>
-  <p>And another for the full match roster overlay (your team left, enemy right, map + team ELO at the bottom):</p>
-  <div class="box" id="rosterUrl"></div>
-  <p style="color:#9ba0a8;font-size:13px;">Size it to your whole stream canvas (e.g. 1920×1080). Invisible except during a live match.</p>
+  <p style="color:#9ba0a8;font-size:13px;">
+    Looking for the live match roster overlay (both teams + team ELO)? That
+    one doesn't need this setup - it works from your FACEIT nickname alone,
+    from the <a href="/">main page</a>.
+  </p>
 
 <script>
   const STORAGE_KEY = 'faceit-overlays-gsi-token';
@@ -109,7 +111,6 @@
 }`;
 
     document.getElementById('alertsUrl').textContent = `${location.origin}/alerts.html?token=${token}`;
-    document.getElementById('rosterUrl').textContent = `${location.origin}/roster.html?token=${token}`;
   }
 
   tokenInput.addEventListener('input', render);

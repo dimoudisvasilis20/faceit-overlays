@@ -33,33 +33,44 @@ have transparent backgrounds, so no chroma key is needed.
 - `mini.html` — level ring + ELO only, suggested size 200×60
 - `compact.html` — level, nickname, ELO(+delta), today's wins/losses, suggested size 320×70
 - `stats.html` — everything above plus K/D, win rate, HS%, ADR, avg kills, suggested size 560×90
+- `roster.html` — full-canvas live match overlay: your team pinned left, enemy
+  team pinned right, map + average team ELO centered at the bottom. Size it
+  to your whole stream canvas (e.g. 1920×1080)
 
 Match start/end alerts (`alerts.html`) work differently — see below.
 
 If you only stream one FACEIT account, set `DEFAULT_NICKNAME` in `.env` and
 drop the `?nickname=` query param entirely.
 
-## Match start/end alerts (CS2 GSI)
+## How live match data works
 
-FACEIT has no official API for "what match is this player in right now" - the
-only endpoint that exposes it is an internal, undocumented one used by
-faceit.com's own website, and it's protected by Cloudflare bot-detection that
-blocks non-browser HTTP clients (including this server) regardless of
-headers. Rather than fight that, `alerts.html` reads live match state
-directly from the CS2 client itself via Valve's **Game State Integration**
-feature - richer data, zero dependency on FACEIT, and it can't be blocked by
-anti-bot tooling since it's an official first-party feature.
+FACEIT has no *documented* API for "what match is this player in right now."
+Two different workarounds cover different overlays:
 
-This only works for the CS2 client on your own PC (GSI is inherently local -
-it's the game reporting on itself), so it's a one-time setup separate from
-the FACEIT-nickname-based overlays above:
+**`roster.html`** calls an internal, undocumented FACEIT endpoint
+(`getLiveMatchId` in `src/faceit.js`) to find the current match, then pulls
+the full roster/score/map from the official Data API. That internal endpoint
+sits behind Cloudflare bot-protection that blocks Node's built-in `fetch`
+specifically by TLS fingerprint (confirmed by testing: identical requests
+succeed via `curl` and get a 403 via `fetch`) - so this call shells out to
+`curl` instead. It's inherently best-effort: FACEIT could block `curl`'s
+fingerprint too, without notice, at any time, and every caller here treats
+failures as "no live match" rather than an error. Requires `curl` to be on
+the server's `PATH` (present by default on Render and most Linux hosts).
+
+**`alerts.html`** instead reads live match state directly from the CS2
+client via Valve's **Game State Integration** feature. This is what
+match-start (map + opponents) and match-end (win/loss + score) are based on.
+It's more reliable for match phase changes, but CS2 only sends full
+`allplayers` data while spectating - never while actively playing - so it
+can't power a persistent, always-on roster like `roster.html` does; that's
+why the two overlays use different data sources. GSI only works for the CS2
+client on your own PC, so it needs a one-time separate setup:
 
 1. Open `/gsi-setup.html` on your deployment - it generates a private token
    and the exact `gamestate_integration_*.cfg` file content for you.
 2. Save that file into CS2's `game/csgo/cfg/` folder and restart CS2.
-3. Add the generated `alerts.html?token=...` URL as a Browser Source. It
-   stays invisible except for a few seconds when a match starts (map +
-   opponents) or ends (win/loss + final score).
+3. Add the generated `alerts.html?token=...` URL as a Browser Source.
 
 `src/gsi.js` holds the latest state per token in memory (no database) and
 treats it as stale/not-live after 45s without an update from the game.

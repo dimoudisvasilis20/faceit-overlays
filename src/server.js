@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { getPlayerSummary, getTodaySummary, getRosterSummaries } from './faceit.js';
+import { getPlayerSummary, getTodaySummary, getLiveMatchRoster } from './faceit.js';
 import { ingestGsiPayload, getGsiState } from './gsi.js';
 import { rateLimit } from './rateLimit.js';
 
@@ -58,21 +58,13 @@ app.get('/api/today', async (req, res) => {
   }
 });
 
-// Resolves FACEIT stats for the current match's roster (from GSI-reported
-// Steam IDs) - meant to be called once per match by the client, not polled.
-app.get('/api/roster/:token', async (req, res) => {
-  const state = getGsiState(req.params.token);
-  if (!state.live || !state.players?.length) {
-    return res.json({ live: false });
+app.get('/api/liveroster', async (req, res) => {
+  const nickname = resolveNickname(req);
+  if (!nickname) {
+    return res.status(400).json({ error: 'Missing ?nickname= and no DEFAULT_NICKNAME set' });
   }
   try {
-    const roster = await getRosterSummaries(state.players.map((p) => p.steamId));
-    res.json({
-      live: true,
-      playerTeam: state.playerTeam,
-      players: state.players,
-      roster,
-    });
+    res.json(await getLiveMatchRoster(nickname));
   } catch (err) {
     res.status(502).json({ error: err.message });
   }

@@ -1,3 +1,8 @@
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+
+const execFileAsync = promisify(execFile);
+
 const DATA_API = 'https://open.faceit.com/data/v4';
 const GAME_ID = 'cs2';
 
@@ -80,28 +85,116 @@ export async function getPlayerSummary(nickname) {
   return summary;
 }
 
-export async function getPlayerByGameId(gameId) {
-  return cached(`steam:${gameId}`, 60_000, () =>
-    dataApiGet(`/players?game=${GAME_ID}&game_player_id=${encodeURIComponent(gameId)}`)
+// FACEIT's own website calls an internal, undocumented endpoint to show
+// "current match" state, but it's behind Cloudflare bot-protection that
+// blocks Node's built-in fetch (undici) specifically by TLS fingerprint -
+// confirmed by testing: identical headers succeed via curl and fail via
+// fetch with a 403. Shelling out to curl for just this one call sidesteps
+// that false positive without spoofing anything curl doesn't already send
+// by default. Still best-effort: FACEIT could block curl's fingerprint too,
+// with no warning, at any time - every caller must treat failures as
+// "no live match" rather than an error.
+async function curlJson(url, extraHeaders = {}) {
+  const headerArgs = Object.entries(extraHeaders).flatMap(([k, v]) => ['-H', `${k}: ${v}`]);
+  const { stdout } = await execFileAsync(
+    'curl',
+    [
+      '-s',
+      '-A',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      ...headerArgs,
+      url,
+    ],
+    { timeout: 8000, maxBuffer: 5 * 1024 * 1024 }
   );
+  return JSON.parse(stdout);
 }
 
-// Looks up FACEIT stats for a whole match's roster by Steam ID (as reported
-// by CS2's GSI, which knows nothing about FACEIT accounts). Not every
-// steamId is guaranteed to resolve - a player might not have a FACEIT
-// account linked to that Steam profile - so each entry is best-effort.
-export async function getRosterSummaries(steamIds) {
-  return Promise.all(
-    steamIds.map(async (steamId) => {
-      try {
-        const player = await getPlayerByGameId(steamId);
-        const summary = await summarizePlayer(player);
-        return summary ? { steamId, found: true, ...summary } : { steamId, found: false };
-      } catch {
-        return { steamId, found: false };
-      }
-    })
+async function getLiveMatchId(playerId) {
+  return cached(`livematchid:${playerId}`, 8_000, async () => {
+    try {
+      const body = await curlJson(
+        `https://www.faceit.com/api/match/v1/matches/groupByState?userId=${playerId}`,
+        { Referer: 'https://www.faceit.com/en/players/', Accept: 'application/json' }
+      );
+      const ongoing = body?.payload?.ONGOING;
+      return Array.isArray(ongoing) ? ongoing[0]?.id ?? null : null;
+    } catch {
+      return null;
+    }
+  });
+}
+
+export async function getPlayerById(playerId) {
+  return cached(`byid:${playerId}`, 20_000, () => dataApiGet(`/players/${playerId}`));
+}
+
+async function summarizeRosterMember(rosterEntry) {
+  const [playerFull, stats] = await Promise.all([
+    getPlayerById(rosterEntry.player_id).catch(() => null),
+    getPlayerStats(rosterEntry.player_id).catch(() => null),
+  ]);
+  const gameData = playerFull?.games?.[GAME_ID];
+  const lifetime = stats?.lifetime ?? {};
+
+  const totalKills = Number(lifetime['Total Kills with extended stats']);
+  const totalMatches = Number(lifetime['Total Matches']);
+  const avgKills = totalKills && totalMatches ? Math.round((totalKills / totalMatches) * 10) / 10 : null;
+
+  return {
+    playerId: rosterEntry.player_id,
+    nickname: rosterEntry.nickname,
+    avatar: rosterEntry.avatar || playerFull?.avatar || null,
+    country: playerFull?.country || null,
+    elo: gameData?.faceit_elo ?? null,
+    level: gameData?.skill_level ?? rosterEntry.game_skill_level ?? null,
+    stats: {
+      winRatePct: lifetime['Win Rate %'] ?? null,
+      kd: lifetime['Average K/D Ratio'] ?? null,
+      headshotPct: lifetime['Average Headshots %'] ?? null,
+      avgKills,
+    },
+  };
+}
+
+// Full roster + live score for whatever match `nickname` is currently in,
+// sourced entirely from FACEIT (official Data API for match/player details,
+// the curl workaround above only to discover the match id). Unlike the GSI
+// allplayers approach, this has no "must be spectating" restriction, so it
+// works continuously for the whole match.
+export async function getLiveMatchRoster(nickname) {
+  const player = await getPlayerByNickname(nickname);
+  const matchId = await getLiveMatchId(player.player_id);
+  if (!matchId) return { live: false };
+
+  const match = await dataApiGet(`/matches/${matchId}`).catch(() => null);
+  if (!match) return { live: false };
+
+  const factionEntries = Object.entries(match.teams || {});
+  const myEntry = factionEntries.find(([, team]) =>
+    team.roster?.some((p) => p.player_id === player.player_id)
   );
+  const otherEntry = factionEntries.find(([faction]) => faction !== myEntry?.[0]);
+
+  const mapPick = match.voting?.map?.pick?.[0] ?? null;
+  const mapEntity = match.voting?.map?.entities?.find(
+    (e) => e.class_name === mapPick || e.guid === mapPick
+  );
+
+  const [mine, enemy] = await Promise.all([
+    Promise.all((myEntry?.[1]?.roster || []).map(summarizeRosterMember)),
+    Promise.all((otherEntry?.[1]?.roster || []).map(summarizeRosterMember)),
+  ]);
+
+  return {
+    live: true,
+    map: mapEntity?.name ?? mapPick,
+    status: match.status ?? null,
+    myScore: myEntry ? match.results?.score?.[myEntry[0]] ?? null : null,
+    enemyScore: otherEntry ? match.results?.score?.[otherEntry[0]] ?? null : null,
+    mine,
+    enemy,
+  };
 }
 
 export async function getTodaySummary(nickname) {
