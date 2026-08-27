@@ -73,9 +73,26 @@ app.get('/api/liveroster', async (req, res) => {
 
 // TEMPORARY diagnostic route - remove once the curl-on-Render question is settled.
 app.get('/api/debugcurl', (req, res) => {
-  execFile('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', 'https://faceit.com'], { timeout: 8000 }, (err, stdout, stderr) => {
-    res.json({ err: err ? { message: err.message, code: err.code } : null, stdout, stderr });
-  });
+  const userId = req.query.userId || '0e72edb6-a398-43ce-9fc6-a87c0f7d59cc';
+  execFile(
+    'curl',
+    [
+      '-s',
+      '-A',
+      'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36',
+      '-H',
+      'Referer: https://www.faceit.com/en/players/',
+      '-H',
+      'Accept: application/json',
+      '-w',
+      '\n__STATUS__%{http_code}',
+      `https://www.faceit.com/api/match/v1/matches/groupByState?userId=${userId}`,
+    ],
+    { timeout: 8000, maxBuffer: 5 * 1024 * 1024 },
+    (err, stdout, stderr) => {
+      res.json({ err: err ? { message: err.message, code: err.code } : null, stdout: stdout.slice(0, 1000), stderr });
+    }
+  );
 });
 
 app.listen(PORT, () => {
