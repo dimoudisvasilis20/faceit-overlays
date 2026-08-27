@@ -2,6 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { execFile } from 'node:child_process';
 import { getPlayerSummary, getTodaySummary, getLiveMatchRoster } from './faceit.js';
 import { ingestGsiPayload, getGsiState } from './gsi.js';
 import { rateLimit } from './rateLimit.js';
@@ -68,6 +69,13 @@ app.get('/api/liveroster', async (req, res) => {
   } catch (err) {
     res.status(502).json({ error: err.message });
   }
+});
+
+// TEMPORARY diagnostic route - remove once the curl-on-Render question is settled.
+app.get('/api/debugcurl', (req, res) => {
+  execFile('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', 'https://faceit.com'], { timeout: 8000 }, (err, stdout, stderr) => {
+    res.json({ err: err ? { message: err.message, code: err.code } : null, stdout, stderr });
+  });
 });
 
 app.listen(PORT, () => {
