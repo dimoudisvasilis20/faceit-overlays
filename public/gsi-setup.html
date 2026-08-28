@@ -62,10 +62,13 @@
   <h2>2. Restart CS2</h2>
   <p>Fully close and reopen Counter-Strike 2 so it picks up the new config file.</p>
 
-  <h2>3. Add the overlay to OBS/Streamlabs</h2>
+  <h2>3. Add the overlays to OBS/Streamlabs</h2>
   <p>Add a <strong>Browser Source</strong> for match start/end alerts:</p>
   <div class="box" id="alertsUrl"></div>
   <p style="color:#9ba0a8;font-size:13px;">Suggested size: 320×90. Transparent, and invisible except for a few seconds when a match starts or ends.</p>
+  <p>And another for the live round HUD (score, timer, bomb, your health/armor/money/weapon):</p>
+  <div class="box" id="hudUrl"></div>
+  <p style="color:#9ba0a8;font-size:13px;">Suggested size: 900×80. Currently shows your own live status only - see the tournament HUD notes below for the full-roster version.</p>
   <p style="color:#9ba0a8;font-size:13px;">
     Looking for the live match roster overlay (both teams + team ELO)? That
     one doesn't need this setup - it works from your FACEIT nickname alone,
@@ -101,16 +104,24 @@
   "heartbeat" "30.0"
   "data"
   {
-    "provider"      "1"
-    "map"           "1"
-    "round"         "1"
-    "player_id"     "1"
-    "player_state"  "1"
-    "allplayers_id" "1"
+    "provider"           "1"
+    "map"                "1"
+    "round"              "1"
+    "player_id"          "1"
+    "player_state"       "1"
+    "player_weapons"     "1"
+    "allplayers_id"      "1"
+    "allplayers_state"   "1"
+    "allplayers_weapons" "1"
+    "allplayers_position" "1"
+    "player_match_stats" "1"
+    "allplayers_match_stats" "1"
+    "phase_countdowns"   "1"
   }
 }`;
 
     document.getElementById('alertsUrl').textContent = `${location.origin}/alerts.html?token=${token}`;
+    document.getElementById('hudUrl').textContent = `${location.origin}/tournament-hud.html?token=${token}`;
   }
 
   tokenInput.addEventListener('input', render);

@@ -37,7 +37,8 @@ have transparent backgrounds, so no chroma key is needed.
   team pinned right, map + average team ELO centered at the bottom. Size it
   to your whole stream canvas (e.g. 1920×1080)
 
-Match start/end alerts (`alerts.html`) work differently — see below.
+Match start/end alerts (`alerts.html`) and the tournament HUD
+(`tournament-hud.html`) work differently — see below.
 
 If you only stream one FACEIT account, set `DEFAULT_NICKNAME` in `.env` and
 drop the `?nickname=` query param entirely.
@@ -98,6 +99,35 @@ client on your own PC, so it needs a one-time separate setup:
 
 `src/gsi.js` holds the latest state per token in memory (no database) and
 treats it as stale/not-live after 45s without an update from the game.
+
+## Tournament HUD (`tournament-hud.html`)
+
+A broadcast-style overlay modeled on production CS2 tournament HUDs (LHM.gg,
+etc.): top score bar with team names/round timer/bomb status, a mini radar,
+side rosters for both teams (HP, money, kills, weapon), and a card for
+whichever player GSI is currently reporting on. Uses the same GSI token as
+`alerts.html` - add `"allplayers_state"`, `"allplayers_weapons"`,
+`"allplayers_position"`, `"player_match_stats"`, and
+`"allplayers_match_stats"` to your `.cfg` (already included if you regenerate
+it from `/gsi-setup.html`).
+
+Query params: `?token=...` (required), `?ctName=` / `?tName=` (default "CT"
+/"T" - GSI has no concept of clan names), `?maxRounds=` (default 24, used
+only for the "Round X/Y" label).
+
+**Same spectating restriction as the full roster overlay applies to the side
+panels** - `allplayers_state`/`allplayers_weapons` only populate while the
+reporting client is spectating, not while actively playing. In solo-stream
+use, only your own row (bottom card) reliably updates. A dedicated
+observer/GOTV client feeding GSI is what makes the full 10-player HUD work,
+which is the actual tournament-production use case this is built for.
+
+**Radar dots are real (from `allplayers_position`, calibrated per-map), but
+the background is a plain grid, not the actual map art** - Valve's map radar
+images are copyrighted assets we don't have redistribution rights to, so we
+never bundle or serve them. Same reasoning applies to player photos (shown
+as initials) and team logos (shown as text) - supply your own image assets
+if you want those, we just don't ship any.
 
 ## Notes & limitations
 

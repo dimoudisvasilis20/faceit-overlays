@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>CS2 Tournament HUD</title>
+<link rel="stylesheet" href="shared.css" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3/dist/tabler-icons.min.css" />
+<style>
+  html, body { width: 100%; height: 100%; }
+  #wrap { position: fixed; inset: 0; transition: opacity 0.3s ease; }
+
+  /* Top score bar */
+  #scorebar {
+    position: absolute;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: stretch;
+    height: 56px;
+    border-radius: 6px;
+    overflow: hidden;
+    font-weight: 700;
+  }
+  #scorebar .side { display: flex; flex-direction: column; justify-content: center; padding: 4px 18px; position: relative; }
+  #scorebar .side.ct { background: #16324f; }
+  #scorebar .side.t { background: #5c3f1a; }
+  #scorebar .side .toprow { display: flex; align-items: center; gap: 10px; }
+  #scorebar .side.t .toprow { flex-direction: row-reverse; }
+  #scorebar .name { font-size: 16px; letter-spacing: 0.5px; text-transform: uppercase; }
+  #scorebar .score { font-size: 24px; }
+  #scorebar .underline { height: 3px; margin-top: 4px; border-radius: 2px; }
+  #scorebar .side.ct .underline { background: #6fa8dc; }
+  #scorebar .side.t .underline { background: #e8a33d; }
+  #scorebar .alive { display: flex; align-items: center; gap: 4px; font-size: 10px; font-weight: 700; color: var(--text-dim); margin-top: 2px; }
+  #scorebar .side.t .alive { flex-direction: row-reverse; }
+  #scorebar .mid {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    background: #101114;
+    padding: 0 20px;
+    min-width: 110px;
+  }
+  #scorebar .timer { font-size: 17px; font-variant-numeric: tabular-nums; }
+  #scorebar .roundinfo { font-size: 9px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.4px; margin-top: 2px; }
+  #bombTag {
+    position: absolute;
+    top: 78px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 11px;
+    font-weight: 700;
+    color: #f87171;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /* Side rosters */
+  .roster { position: absolute; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 5px; width: 300px; }
+  #ctRoster { left: 16px; }
+  #tRoster { right: 16px; }
+  .prow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: #101114;
+    transition: opacity 0.3s ease;
+  }
+  .prow.t { flex-direction: row-reverse; }
+  .prow.ct { background: #6fa8dc; }
+  .prow.t { background: #e8a33d; }
+  .prow.dead { opacity: 0.4; }
+  .pavatarwrap { position: relative; flex-shrink: 0; }
+  .pnum {
+    position: absolute;
+    top: -4px;
+    left: -4px;
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 9px;
+    font-weight: 700;
+  }
+  .prow.t .pnum { left: auto; right: -4px; }
+  .pavatar {
+    width: 32px;
+    height: 32px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+  }
+  .pinfo { flex: 1; min-width: 0; }
+  .ptoprow { display: flex; align-items: center; justify-content: space-between; gap: 6px; }
+  .prow.t .ptoprow { flex-direction: row-reverse; }
+  .pname { font-size: 12px; font-weight: 700; text-transform: uppercase; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .prow.dead .pname { text-decoration: line-through; }
+  .phealth { display: flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 700; flex-shrink: 0; }
+  .pbottomrow { display: flex; align-items: center; gap: 8px; font-size: 10px; font-weight: 600; margin-top: 2px; }
+  .prow.t .pbottomrow { flex-direction: row-reverse; }
+  .pbottomrow .item { display: flex; align-items: center; gap: 2px; }
+  .pweaponbadge { font-size: 8px; font-weight: 700; padding: 1px 5px; border-radius: 3px; background: rgba(0, 0, 0, 0.35); color: #fff; }
+
+  /* Bottom observed-player card */
+  #observed {
+    position: absolute;
+    bottom: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 8px;
+    padding: 8px 16px;
+  }
+  #observedAvatar {
+    width: 34px;
+    height: 34px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    background: rgba(255, 255, 255, 0.08);
+    border: 2px solid #4ade80;
+  }
+  #observedName { font-weight: 700; font-size: 14px; text-transform: uppercase; }
+  .stat { display: flex; flex-direction: column; align-items: center; min-width: 46px; }
+  .stat-value { font-size: 14px; font-weight: 700; display: flex; align-items: center; gap: 3px; }
+  .stat-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text-dim); }
+  #sponsor {
+    position: absolute;
+    bottom: -34px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+  }
+
+  #radar {
+    position: absolute;
+    top: 16px;
+    left: 16px;
+    width: 180px;
+    height: 180px;
+    border-radius: 8px;
+    background: var(--bg-panel);
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    overflow: hidden;
+  }
+  #radarGrid {
+    position: absolute;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(255, 255, 255, 0.08) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 255, 255, 0.08) 1px, transparent 1px);
+    background-size: 22.5px 22.5px;
+  }
+  #radarGrid::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    margin: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+  .rdot {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 1px solid rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 6px;
+    font-weight: 700;
+    color: #101114;
+    transition: left 0.5s linear, top 0.5s linear;
+  }
+  .rdot.ct { background: #6fa8dc; }
+  .rdot.t { background: #e8a33d; }
+</style>
+</head>
+<body>
+  <div id="wrap" class="hidden">
+    <div id="scorebar">
+      <div class="side ct">
+        <div class="toprow"><span class="name" id="ctName">CT</span><span class="score" id="ctScore">-</span></div>
+        <div class="underline"></div>
+        <div class="alive"><i class="ti ti-users" aria-hidden="true"></i><span id="ctAlive">5</span></div>
+      </div>
+      <div class="mid">
+        <div class="timer" id="timer">-:--</div>
+        <div class="roundinfo" id="roundInfo">Round -</div>
+      </div>
+      <div class="side t">
+        <div class="toprow"><span class="score" id="tScore">-</span><span class="name" id="tName">T</span></div>
+        <div class="underline"></div>
+        <div class="alive"><i class="ti ti-users" aria-hidden="true"></i><span id="tAlive">5</span></div>
+      </div>
+    </div>
+    <div id="bombTag" class="hidden"><i class="ti ti-bomb" aria-hidden="true"></i> Bomb planted</div>
+
+    <div id="radar">
+      <div id="radarGrid"></div>
+      <div id="radarDots"></div>
+    </div>
+
+    <div class="roster" id="ctRoster"></div>
+    <div class="roster" id="tRoster"></div>
+
+    <div id="observed">
+      <div id="observedAvatar">-</div>
+      <div id="observedName">-</div>
+      <div class="stat"><div class="stat-value"><i class="ti ti-heart" aria-hidden="true"></i><span id="healthValue">-</span></div><div class="stat-label">HP</div></div>
+      <div class="stat"><div class="stat-value"><i class="ti ti-shield" aria-hidden="true"></i><span id="armorValue">-</span></div><div class="stat-label">Armor</div></div>
+      <div class="stat"><div class="stat-value"><i class="ti ti-coin" aria-hidden="true"></i><span id="moneyValue">-</span></div><div class="stat-label">Money</div></div>
+      <div class="stat"><div class="stat-value"><i class="ti ti-skull" aria-hidden="true"></i><span id="killsValue">-</span></div><div class="stat-label">Kills</div></div>
+      <div class="stat"><div class="stat-value" id="weaponValue">-</div><div class="stat-label">Weapon</div></div>
+      <div id="sponsor">Your sponsor</div>
+    </div>
+  </div>
+
+<script>
+  const params = new URLSearchParams(location.search);
+  const token = params.get('token');
+  const pollMs = Number(params.get('refresh')) || 2_000;
+  const ctName = params.get('ctName') || 'CT';
+  const tName = params.get('tName') || 'T';
+  const maxRounds = Number(params.get('maxRounds')) || 24;
+  const el = (id) => document.getElementById(id);
+
+  el('ctName').textContent = ctName;
+  el('tName').textContent = tName;
+
+  const WEAPON_BADGES = {
+    Rifle: 'RIF', Pistol: 'PIS', SMG: 'SMG', 'Sniper Rifle': 'AWP',
+    Shotgun: 'SHG', 'Machine Gun': 'LMG', Knife: 'KNF', C4: 'C4',
+    Grenade: 'GRN', Tablet: 'ZEUS',
+  };
+
+  function formatTimer(phaseEndsIn) {
+    const secs = Math.max(0, Math.ceil(Number(phaseEndsIn)));
+    if (!Number.isFinite(secs)) return '-:--';
+    const m = Math.floor(secs / 60);
+    const s = String(secs % 60).padStart(2, '0');
+    return `${m}:${s}`;
+  }
+
+  function playerRowHtml(p, index, side) {
+    const dead = p.health != null && p.health <= 0;
+    const initial = (p.name || '?').trim().charAt(0).toUpperCase();
+    const weaponLabel = dead ? '-' : WEAPON_BADGES[p.weaponType] || '-';
+    return `
+      <div class="prow ${side}${dead ? ' dead' : ''}">
+        <div class="pavatarwrap">
+          <div class="pnum">${index}</div>
+          <div class="pavatar">${dead ? '×' : initial}</div>
+        </div>
+        <div class="pinfo">
+          <div class="ptoprow">
+            <div class="pname">${p.name || 'Unknown'}</div>
+            ${dead ? '' : `<div class="phealth"><i class="ti ti-heart" aria-hidden="true"></i>${p.health ?? '-'}</div>`}
+          </div>
+          <div class="pbottomrow">
+            <div class="item"><i class="ti ti-coin" aria-hidden="true"></i>${p.money ?? 0}</div>
+            <div class="item"><i class="ti ti-skull" aria-hidden="true"></i>${p.kills ?? 0}</div>
+            <div class="pweaponbadge">${weaponLabel}</div>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function radarDotHtml(p, index) {
+    if (p.radarX == null || p.radarY == null) return '';
+    if (p.health != null && p.health <= 0) return '';
+    const x = Math.max(0, Math.min(1, p.radarX)) * 180;
+    const y = Math.max(0, Math.min(1, p.radarY)) * 180;
+    const side = p.team === 'CT' ? 'ct' : 't';
+    return `<div class="rdot ${side}" style="left:${x}px;top:${y}px" title="${p.name || ''}">${index}</div>`;
+  }
+
+  function render(state) {
+    if (!state || !state.live) {
+      el('wrap').classList.add('hidden');
+      return;
+    }
+
+    el('ctScore').textContent = state.ctScore ?? '-';
+    el('tScore').textContent = state.tScore ?? '-';
+    el('timer').textContent = state.phaseEndsIn != null ? formatTimer(state.phaseEndsIn) : '-:--';
+    el('roundInfo').textContent =
+      state.round != null
+        ? `Round ${state.round + 1}/${maxRounds} · ${(state.map || '').replace(/^de_/, '')}`
+        : (state.map || '').replace(/^de_/, '');
+    el('bombTag').classList.toggle('hidden', state.bomb !== 'planted');
+
+    const ct = (state.players || []).filter((p) => p.team === 'CT');
+    const t = (state.players || []).filter((p) => p.team === 'T');
+    el('ctRoster').innerHTML = ct.map((p, i) => playerRowHtml(p, i + 1, 'ct')).join('');
+    el('tRoster').innerHTML = t.map((p, i) => playerRowHtml(p, ct.length + i + 1, 't')).join('');
+    el('ctAlive').textContent = ct.filter((p) => p.health == null || p.health > 0).length || ct.length || 5;
+    el('tAlive').textContent = t.filter((p) => p.health == null || p.health > 0).length || t.length || 5;
+
+    const allPlayers = state.players || [];
+    el('radarDots').innerHTML = allPlayers
+      .map((p) => radarDotHtml(p, allPlayers.indexOf(p) + 1))
+      .join('');
+
+    el('observedName').textContent = state.playerName || '-';
+    el('observedAvatar').textContent = (state.playerName || '?').trim().charAt(0).toUpperCase();
+    el('healthValue').textContent = state.playerHealth ?? '-';
+    el('armorValue').textContent = state.playerArmor ?? '-';
+    el('moneyValue').textContent = state.playerMoney ?? '-';
+    el('killsValue').textContent = state.playerKills ?? '-';
+    el('weaponValue').textContent = state.playerWeapon ? state.playerWeapon.replace(/_/g, ' ') : '-';
+
+    el('wrap').classList.remove('hidden');
+  }
+
+  async function poll() {
+    if (!token) return;
+    try {
+      const res = await fetch(`/api/gsi/${encodeURIComponent(token)}`);
+      const state = await res.json();
+      render(state);
+    } catch {
+      // Transient error - keep showing whatever was last rendered.
+    }
+  }
+
+  poll();
+  setInterval(poll, pollMs);
+</script>
+</body>
+</html>
